@@ -230,6 +230,7 @@ function LoanTransactions() {
       >
         <Collapsible title={item.name}>
           {/* <ThemedText className="font-bold text-lg mb-1">{item.name}</ThemedText> */}
+          <ThemedView>
           <ThemedText className="text-gray-600">Initial Amount: ₹{item.amount}</ThemedText>
           <ThemedText className="text-gray-600">Current Amount: ₹{item.currentAmount.toFixed(2)}</ThemedText>
           <ThemedText className="text-gray-600">Interest Rate: {item.rateOfInterest}%</ThemedText>
@@ -237,6 +238,7 @@ function LoanTransactions() {
           <ThemedText  className={'font-semibold'}>
             Type: {item.type}
           </ThemedText>
+          </ThemedView>
         </Collapsible>
         
         <View className="relative">
