@@ -1,74 +1,132 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { databases, config, Query } from '../appwrite';
 import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedTextInput } from '@/components/ThemedTextInput';
+import { useTranslation } from 'react-i18next';
 
 export default function HomeScreen() {
+  const { t, i18n } = useTranslation();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    if (searchQuery.length > 2) {
+      performSearch();
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  const performSearch = async () => {
+    try {
+      const loansResponse = await databases.listDocuments(
+        config.databaseId,
+        config.loansCollectionId,
+        [Query.search('name', searchQuery)]
+      );
+
+      const landResponse = await databases.listDocuments(
+        config.databaseId,
+        config.landActivitiesCollectionId,
+        [Query.search('name', searchQuery)]
+      );
+
+      const combinedResults = [
+        ...loansResponse.documents.map(doc => ({ ...doc, type: 'loan' })),
+        ...landResponse.documents.map(doc => ({ ...doc, type: 'land' }))
+      ];
+
+      setSearchResults(combinedResults);
+    } catch (error) {
+      console.error('Error performing search', error);
+    }
+  };
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'te' : 'en';
+    i18n.changeLanguage(newLang);
+  };
+
+  const renderSearchResult = ({ item }) => (
+    <TouchableOpacity
+      onPress={() => {
+        if (item.type === 'loan') {
+          navigation.navigate('ledger', { screen: 'LoanDetails', params: { loanId: item.$id } });
+        } else {
+          navigation.navigate('landactivity', { screen: 'LandDetails', params: { activityId: item.$id } });
+        }
+      }}
+    >
+      <ThemedView style={styles.resultItem}>
+        <ThemedText>{item.name}</ThemedText>
+        <ThemedText>{item.type === 'loan' ? `${t('amount')}: ₹${item.amount}` : `${t('LandActivity')}: ${item.landName}`}</ThemedText>
+      </ThemedView>
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <ThemedText style={styles.title}>Ravi's Ledger Book</ThemedText>
+      <ThemedTextInput
+        style={styles.searchInput}
+        placeholder={t('Search')}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+      <TouchableOpacity onPress={toggleLanguage} style={styles.languageToggle}>
+        <ThemedText>{i18n.language === 'en' ? 'Switch to Telugu' : 'ఆంగ్లానికి మారండి'}</ThemedText>
+      </TouchableOpacity>
+      <FlatList
+        data={searchResults}
+        renderItem={renderSearchResult}
+        keyExtractor={(item) => `${item.type}-${item.$id}`}
+        ListEmptyComponent={() => (
+          <ThemedText style={styles.emptyText}>
+            {searchQuery.length > 2 ? t('noResults') : t('enterSearchCriteria')}
+          </ThemedText>
+        )}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    padding: 20,
+    paddingTop: 40,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  searchInput: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 20,
+  },
+  resultItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  languageToggle: {
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    marginBottom: 10,
   },
 });
+

@@ -1,0 +1,48 @@
+{
+
+      "name": "పేరు",
+      "amount": "మొత్తం",
+      "date": "తేదీ",
+      "edit": "సవరించు",
+      "delete": "తొలగించు",
+      "cancel": "రద్దు చేయు",
+      "save": "సేవ్ చేయు",
+      "settleUp": "పరిష్కరించు",
+      "confirm": "నిర్ధారించు",
+      "success": "విజయం",
+      "error": "లోపం",
+      "Home":"హోమ్",
+
+
+      "LandActivity": "భూమి కార్యకలాపాలు",
+      "addActivity": "భూమి కార్యకలాపాన్ని జోడించండి",
+      "landName": "భూమి పేరు",
+      "activity": "కార్యకలాపం",
+      "landInAcres": "ఎకరాల్లో భూమి",
+      "amountPerAcre": "ఎకరానికి మొత్తం",
+      "totalAmount": "మొత్తం మొత్తం",
+      "settledAmount": "పరిష్కరించిన మొత్తం",
+      "status": "స్థితి",
+      "pending": "పెండింగ్",
+      "settled": "పరిష్కరించబడింది",
+
+      "Loans": "అప్పులు",
+      "addGivenLoan": "ఇచ్చిన అప్పు జోడించండి",
+      "addTakenLoan": "తీసుకున్న అప్పు జోడించండి",
+      "initialAmount": "ప్రారంభ మొత్తం",
+      "currentAmount": "ప్రస్తుత మొత్తం",
+      "interestRate": "వడ్డీ రేటు",
+      "daysElapsed": "గడిచిన రోజులు",
+      "type": "రకం",
+      "given": "ఇచ్చారు",
+      "taken": "తీసుకున్నారు",
+
+      "title": "పరిష్కరించు",
+      "remainingAmount": "మిగిలిన మొత్తం",
+      "amountToSettle": "పరిష్కరించవలసిన మొత్తం",
+      "fullySettled": "పూర్తిగా పరిష్కరించబడింది",
+      "partialSettlement": "పాక్షిక పరిష్కారం నమోదు చేయబడింది"
+    
+  }
+  
+  

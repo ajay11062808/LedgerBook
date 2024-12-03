@@ -226,11 +226,10 @@ function LoanTransactions() {
 
     return (
       <ThemedView style={{ backgroundColor: isGiven ? '#86e33e' : '#ff4444' }}
-        className={`rounded-lg mb-2 p-4 flex-row justify-between items-start`}
-      >
+        className={`rounded mb-2 p-3 flex-row justify-between items-start`}>
         <Collapsible title={item.name}>
           {/* <ThemedText className="font-bold text-lg mb-1">{item.name}</ThemedText> */}
-          <ThemedView className='align-center'>
+          <ThemedView className="flex-col pr-20">
           <ThemedText className="text-gray-600">Initial Amount: ₹{item.amount}</ThemedText>
           <ThemedText className="text-gray-600">Current Amount: ₹{item.currentAmount.toFixed(2)}</ThemedText>
           <ThemedText className="text-gray-600">Interest Rate: {item.rateOfInterest}%</ThemedText>

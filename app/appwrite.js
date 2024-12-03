@@ -1,4 +1,4 @@
-import { Client, Account, ID, Databases } from 'react-native-appwrite';
+import { Client, Account, ID, Databases,Query } from 'react-native-appwrite';
 
 const config = {
   endpoint: 'https://cloud.appwrite.io/v1',
@@ -17,4 +17,4 @@ const client = new Client()
 const account = new Account(client);
 const databases = new Databases(client);
 
-export { client, account, databases, config, ID };
+export { client, account, databases, config, ID ,Query};
