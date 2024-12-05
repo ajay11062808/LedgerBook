@@ -6,15 +6,24 @@ import {
   Modal,
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  ScrollView
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { databases, config, ID } from '../appwrite';
+import { databases, config, ID, Query } from '../appwrite';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedTextInput } from '@/components/ThemedTextInput';
 import { Entypo } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/Collapsible';
+import {LoadingOverlay} from '../../components/landactivity/Loading'
+
+interface Settlement {
+  date: string;
+  amount: number;
+  remarks: string;
+}
 
 interface LandActivity {
   $id?: string;
@@ -25,16 +34,33 @@ interface LandActivity {
   landInAcres: number;
   amountPerAcre: number;
   totalAmount: number;
+}
+
+interface GroupSettlement {
+  $id?: string;
+  groupName: string;
+  totalAmount: number;
   settledAmount: number;
   isSettled: boolean;
-  individualActivities?: LandActivity[]; // New optional property
+  settlements: Settlement[];
+}
+
+interface GroupedActivity {
+  name: string;
+  totalAmount: number;
+  settledAmount: number;
+  isSettled: boolean;
+  activities: LandActivity[];
+  settlements: Settlement[];
 }
 
 function LandActivitiesTracker() {
   const [activities, setActivities] = useState<LandActivity[]>([]);
+  const [groupedActivities, setGroupedActivities] = useState<GroupedActivity[]>([]);
+  const [groupSettlements, setGroupSettlements] = useState<GroupSettlement[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-
+  const [isSettlementDatePickerVisible, setSettlementDatePickerVisible] = useState(false);
   const [name, setName] = useState('');
   const [landName, setLandName] = useState('');
   const [activity, setActivity] = useState('');
@@ -42,24 +68,45 @@ function LandActivitiesTracker() {
   const [landInAcres, setLandInAcres] = useState('');
   const [amountPerAcre, setAmountPerAcre] = useState('');
   const [totalAmount, setTotalAmount] = useState('0.00');
-  const [expenses, setExpenses] = useState(''); 
   const [editingActivity, setEditingActivity] = useState<LandActivity | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
+  const [settleRemarks, setSettleRemarks] = useState('');
   const [isSettleModalVisible, setSettleModalVisible] = useState(false);
-  const [settlingActivity, setSettlingActivity] = useState<LandActivity | null>(null);
+  const [settlingGroup, setSettlingGroup] = useState<GroupedActivity | null>(null);
+  const [settlementDate, setSettlementDate] = useState(new Date());
+  const [filterName, setFilterName] = useState('');
+ 
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+
+  const { t } = useTranslation();
 
   useEffect(() => {
     fetchActivities();
   }, []);
 
+  useEffect(() => {
+    const grouped = groupActivitiesByName(activities, groupSettlements);
+    setGroupedActivities(grouped);
+  }, [activities, groupSettlements]);
+
   const fetchActivities = async () => {
     try {
-      const response = await databases.listDocuments(
-        config.databaseId,
-        config.landActivitiesCollectionId
-      );
-      const fetchedActivities = response.documents.map(doc => ({
+      setIsLoading(true);
+      setLoadingMessage(t('Loading Activities'));
+      const [activitiesResponse, settlementsResponse] = await Promise.all([
+        databases.listDocuments(
+          config.databaseId,
+          config.landActivitiesCollectionId,
+          [Query.orderDesc('date')]
+        ),
+        databases.listDocuments(
+          config.databaseId,
+          config.groupSettlementsCollectionId
+        )
+      ]);
+
+      const fetchedActivities = activitiesResponse.documents.map(doc => ({
         $id: doc.$id,
         name: doc.name,
         landName: doc.landName,
@@ -68,14 +115,69 @@ function LandActivitiesTracker() {
         landInAcres: doc.landInAcres,
         amountPerAcre: doc.amountPerAcre,
         totalAmount: doc.totalAmount,
-        settledAmount: doc.settledAmount ?? 0,
-        isSettled: doc.isSettled ?? false,
       }));
       setActivities(fetchedActivities);
+
+      const fetchedSettlements = settlementsResponse.documents.map(doc => {
+        const settlements: Settlement[] = [];
+        if (doc.settlementDates && doc.settlementAmounts && doc.settlementRemarks) {
+          for (let i = 0; i < doc.settlementDates.length; i++) {
+            settlements.push({
+              date: doc.settlementDates[i],
+              amount: doc.settlementAmounts[i],
+              remarks: doc.settlementRemarks[i]
+            });
+          }
+        }
+        return{
+        $id: doc.$id,
+        groupName: doc.groupName,
+        totalAmount: doc.totalAmount,
+        settledAmount: doc.settledAmount,
+        isSettled: doc.isSettled,
+        settlements: settlements,
+        }
+      });
+      setGroupSettlements(fetchedSettlements);
     } catch (error) {
-      console.error('Error fetching activities', error);
+      console.error('Error fetching data', error);
+    }
+    finally {
+      setIsLoading(false);
+      setLoadingMessage('');
     }
   };
+
+  function groupActivitiesByName(activities: LandActivity[], settlements: GroupSettlement[]): GroupedActivity[] {
+    const groupedMap = activities.reduce((acc, activity) => {
+      if (!acc[activity.name]) {
+        const groupSettlement = settlements.find(s => s.groupName === activity.name) || {
+          totalAmount: 0,
+          settledAmount: 0,
+          isSettled: false,
+          settlements: [],
+          settlementDates: [],
+         settlementAmounts: [],
+         settlementRemarks: [],
+        };
+        acc[activity.name] = {
+          name: activity.name,
+          totalAmount: 0,
+          settledAmount: groupSettlement.settledAmount,
+          isSettled: groupSettlement.isSettled,
+          activities: [],
+          settlements: groupSettlement.settlements,
+        };
+      }
+
+      acc[activity.name].activities.push(activity);
+      acc[activity.name].totalAmount += activity.totalAmount;
+      acc[activity.name].isSettled = acc[activity.name].settledAmount >= acc[activity.name].totalAmount;
+      return acc;
+    }, {} as Record<string, GroupedActivity>);
+
+    return Object.values(groupedMap);
+  }
 
   const resetForm = () => {
     setName('');
@@ -96,11 +198,16 @@ function LandActivitiesTracker() {
 
   const addOrEditActivity = async () => {
     if (!name || !landName || !activity || !landInAcres) {
-      Alert.alert('Validation Error', 'Please fill all fields');
+      Alert.alert(t('ValidationError'), t('PleaseAllFields'));
       return;
     }
 
     try {
+      setIsLoading(true);
+      setLoadingMessage(editingActivity 
+        ? t('Updating Activity') 
+        : t('Adding Activity')
+      );
       const activityData = {
         name,
         landName,
@@ -109,8 +216,6 @@ function LandActivitiesTracker() {
         landInAcres: parseFloat(landInAcres),
         amountPerAcre: parseFloat(amountPerAcre),
         totalAmount: parseFloat(totalAmount),
-        settledAmount: parseFloat(settleAmount),
-        isSettled: false,
       };
 
       if (editingActivity && editingActivity.$id) {
@@ -129,25 +234,93 @@ function LandActivitiesTracker() {
         );
       }
 
+      // Update group settlement total amount
+      const groupName = editingActivity ? editingActivity.name : name;
+      const groupSettlement = groupSettlements.find(s => s.groupName === groupName);
+      if (groupSettlement) {
+        const updatedActivities = editingActivity
+          ? activities.map(a => (a.$id === editingActivity.$id ? activityData : a))
+          : [...activities, activityData];
+        const newTotalAmount = updatedActivities
+          .filter(a => a.name === groupName)
+          .reduce((sum, a) => sum + a.totalAmount, 0);
+
+        await databases.updateDocument(
+          config.databaseId,
+          config.groupSettlementsCollectionId,
+          groupSettlement.$id!,
+          { totalAmount: newTotalAmount }
+        );
+      } else {
+        // Create new group settlement if it doesn't exist
+        await databases.createDocument(
+          config.databaseId,
+          config.groupSettlementsCollectionId,
+          ID.unique(),
+          {
+            groupName: groupName,
+            totalAmount: parseFloat(totalAmount),
+            settledAmount: 0,
+            isSettled: false,
+            settlementDates: [],
+            settlementAmounts: [],
+            settlementRemarks: [],
+          }
+        );
+      }
+
       await fetchActivities();
       resetForm();
     } catch (error) {
       console.error('Error saving activity', error);
-      Alert.alert('Error', 'Failed to save activity');
+      Alert.alert(t('Error'), t('FailedToSaveActivity'));
+    }
+    finally{
+      setIsLoading(false);
+      setLoadingMessage('')
     }
   };
 
   const deleteActivity = async (id: string) => {
     try {
+      setIsLoading(true);
+      setLoadingMessage(t('Deleting Activity'));
+
+      const activityToDelete = activities.find(a => a.$id === id);
+      if (!activityToDelete) {
+        throw new Error('Activity not found');
+      }
+
       await databases.deleteDocument(
         config.databaseId,
         config.landActivitiesCollectionId,
         id
       );
+
+      // Update group settlement total amount
+      const groupSettlement = groupSettlements.find(s => s.groupName === activityToDelete.name);
+      if (groupSettlement) {
+        const updatedActivities = activities.filter(a => a.$id !== id);
+        const newTotalAmount = updatedActivities
+          .filter(a => a.name === activityToDelete.name)
+          .reduce((sum, a) => sum + a.totalAmount, 0);
+
+        await databases.updateDocument(
+          config.databaseId,
+          config.groupSettlementsCollectionId,
+          groupSettlement.$id!,
+          { totalAmount: newTotalAmount }
+        );
+      }
+
       await fetchActivities();
     } catch (error) {
       console.error('Error deleting activity', error);
-      Alert.alert('Error', 'Failed to delete activity');
+      Alert.alert(t('Error'), t('FailedToDeleteActivity'));
+    }
+    finally{
+      setIsLoading(false);
+      setLoadingMessage('')
     }
   };
 
@@ -157,180 +330,166 @@ function LandActivitiesTracker() {
     setLandName(activity.landName);
     setActivity(activity.activity);
     setSelectedDate(activity.date);
-    setLandInAcres(activity.landInAcres?activity.landInAcres.toString():'');
-    setAmountPerAcre(activity.amountPerAcre?activity.amountPerAcre.toString():'');
+    setLandInAcres(activity.landInAcres.toString());
+    setAmountPerAcre(activity.amountPerAcre ? activity.amountPerAcre.toString() : '');
     setTotalAmount(activity.totalAmount.toString());
-    // setSettleAmount(activity.settledAmount?activity.settledAmount.toString():'')
     setModalVisible(true);
   };
 
-  const toggleMenu = (itemId: string | null) => {
-    setOpenMenuId(prevId => prevId === itemId ? null : itemId);
-  };
-
-  const settleUpLand = async (activity: LandActivity, amount: number) => {
+  const settleUpGroup = async (group: GroupedActivity, amount: number, remarks: string) => {
+    const recalculatedTotalAmount = group.activities.reduce((sum, activity) => sum + activity.totalAmount, 0);
     try {
-      const settledAmount = activity.settledAmount + amount;
-      const isFullySettled = settledAmount >= activity.totalAmount;
-      
-      const updatedActivity = {
-        ...activity,
-        settledAmount,
-        isSettled: isFullySettled,
+      setIsLoading(true);
+      setLoadingMessage(t('Settling Amount'));
+
+      const newSettlement: Settlement = {
+        date: settlementDate.toISOString(),
+        amount,
+        remarks
       };
 
-      await databases.updateDocument(
-        config.databaseId,
-        config.landActivitiesCollectionId,
-        activity.$id ?? '',
-        updatedActivity
-      );
+      const updatedGroup = {
+        ...group,
+        totalAmount:recalculatedTotalAmount,
+        settledAmount: group.settledAmount + amount,
+        isSettled: group.settledAmount + amount >= recalculatedTotalAmount,
+        settlements: [...group.settlements, newSettlement],
+      };
 
-      setActivities(activities.map(a => 
-        a.$id === activity.$id ? updatedActivity : a
-      ));
+      // Update or create group settlement
+      const groupSettlement = groupSettlements.find(s => s.groupName === group.name);
+      if (groupSettlement) {
+        await databases.updateDocument(
+          config.databaseId,
+          config.groupSettlementsCollectionId,
+          groupSettlement.$id!,
+          {
+            totalAmount:recalculatedTotalAmount,
+            settledAmount: updatedGroup.settledAmount,
+            isSettled: updatedGroup.isSettled,
+            settlementDates: updatedGroup.settlements.map(s => s.date),
+            settlementAmounts: updatedGroup.settlements.map(s => s.amount),
+            settlementRemarks: updatedGroup.settlements.map(s => s.remarks),
+          }
+        );
+      } else {
+        await databases.createDocument(
+          config.databaseId,
+          config.groupSettlementsCollectionId,
+          ID.unique(),
+          {
+            groupName: group.name,
+            totalAmount: recalculatedTotalAmount,
+            settledAmount: updatedGroup.settledAmount,
+            isSettled: updatedGroup.isSettled,
+            settlementDates: updatedGroup.settlements.map(s => s.date),
+            settlementAmounts: updatedGroup.settlements.map(s => s.amount),
+            settlementRemarks: updatedGroup.settlements.map(s => s.remarks),
+           
+          }
+        );
+      }
 
-      Alert.alert('Success', isFullySettled ? 'Land activity fully settled' : 'Partial settlement recorded');
+      await fetchActivities();
+
+      Alert.alert(t('Success'), updatedGroup.isSettled ? t('Fully Settled') : t('Partial Settlement'));
     } catch (error) {
-      console.error('Error settling up land activity', error);
-      Alert.alert('Error', 'Failed to settle up land activity');
+      console.error('Error settling up group', error);
+      Alert.alert(t('Error'), t('FailedToSettle'));
+    }
+    finally{
+      setIsLoading(false);
+      setLoadingMessage('');
     }
   };
-  const groupActivitiesByName = (activities: LandActivity[]) => {
-    const groupedActivities: Record<string, LandActivity[]> = {};
-    const summaryActivities: LandActivity[] = [];
-  
-    // First, group activities by name
-    activities.forEach(activity => {
-      if (!groupedActivities[activity.name]) {
-        groupedActivities[activity.name] = [];
-      }
-      groupedActivities[activity.name].push(activity);
-    });
-  
-    // Create summary activities
-    Object.keys(groupedActivities).forEach(name => {
-      const userActivities = groupedActivities[name];
-      
-      const totalAmount = userActivities.reduce((sum, activity) => sum + activity.totalAmount, 0);
-      const settledAmount = userActivities.reduce((sum, activity) => sum + activity.settledAmount, 0);
-      const isSettled = settledAmount >= totalAmount;
-  
-      const summaryActivity: LandActivity = {
-        name,
-        landName: userActivities[0].landName, // Use first activity's land name
-        activity: 'Summary', // Indicate this is a summary
-        date: new Date(), // Current date for summary
-        landInAcres: userActivities.reduce((sum, activity) => sum + activity.landInAcres, 0),
-        amountPerAcre: 0, // Not applicable for summary
-        totalAmount,
-        settledAmount,
-        isSettled,
-        $id: `summary-${name}`,
-        individualActivities: userActivities // Store individual activities
-      };
-  
-      summaryActivities.push(summaryActivity);
-    });
-  
-    // Combine individual and summary activities
-    const combinedActivities = activities.concat(summaryActivities);
-  
-    return combinedActivities;
-  };
 
-  const groupedActivities = groupActivitiesByName(activities);
-  const renderActivity = ({ item }: { item: LandActivity }) => {if (item.activity === 'Summary') {
-    return (
-      <ThemedView style={{backgroundColor: item.isSettled ? "#4CAF50" : "#86e33e"}} className={'rounded mb-2 p-3 align-items flex-row justify-between items-start'}>
-        <Collapsible title={`${item.name} - Summary`}>
-          <ThemedView className="flex-col pr-20">
-            <ThemedText className="text-lg font-bold mb-2">Total Summary</ThemedText>
-            <ThemedText className="text-gray-600">Total Land in Acres: {item.landInAcres}</ThemedText>
-            <ThemedText className="text-gray-600">Total Amount: ₹{item.totalAmount}</ThemedText>
-            <ThemedText className="text-gray-600">Settled Amount: ₹{item.settledAmount}</ThemedText>
-            <ThemedText className="text-gray-600">Status: {item.isSettled ? 'Settled' : 'Pending'}</ThemedText>
-            
-            {/* Show individual activities */}
-            <ThemedText className="text-lg font-bold mt-4 mb-2">Individual Activities</ThemedText>
-            {item.individualActivities?.map((activity, index) => (
-              <ThemedView key={index} className="border-t border-gray-200 pt-2 mt-2">
-                <ThemedText className="text-gray-600">Activity: {activity.activity}</ThemedText>
-                <ThemedText className="text-gray-600">Date: {activity.date.toLocaleDateString()}</ThemedText>
-                <ThemedText className="text-gray-600">Land in Acres: {activity.landInAcres}</ThemedText>
-                <ThemedText className="text-gray-600">Amount: ₹{activity.totalAmount}</ThemedText>
-              </ThemedView>
-            ))}
-          </ThemedView>
-        </Collapsible>
-      
-      <View className="relative">
-        <TouchableOpacity 
-          className="p-2"
-          onPress={() => toggleMenu(item.$id ?? null)}
-        >
-          <Entypo name="dots-three-vertical" size={20} color="text-gray-700" />
-        </TouchableOpacity>
+  const renderGroupedActivity = ({ item }: { item: GroupedActivity }) => (
+    <Collapsible title={item.name}>
+      <ThemedView style={{backgroundColor: item.isSettled ? "#9c8686" : "#86e33e"}} className={'rounded mb-2 p-3'}>
+        <ThemedText className="text-lg font-bold">{item.name}</ThemedText>
+        <ThemedText>{t('Total Amount')}: ₹{item.totalAmount.toFixed(2)}</ThemedText>
+        <ThemedText>{t('Settled Amount')}: ₹{item.settledAmount.toFixed(2)}</ThemedText>
+        <ThemedText>{t('Remaining Amount')}: ₹{(item.totalAmount - item.settledAmount).toFixed(2)}</ThemedText>
+        <ThemedText>{t('Status')}: {item.isSettled ? t('Settled') : t('Pending')}</ThemedText>
         
-        {openMenuId === item.$id && (
-          <ThemedView className="absolute top-8 right-0 bg-white rounded-lg shadow-lg z-10 w-36">
-            <TouchableOpacity 
-              className="p-4 border-b border-gray-100"
-              onPress={() => {
-                editActivity(item);
-                setOpenMenuId(null);
-              }}
-            >
-              <ThemedText className="text-center">Edit</ThemedText>
-            </TouchableOpacity>
-            {!item.isSettled && (
+        {!item.isSettled && (
+          <TouchableOpacity 
+            className="mt-2 p-2 bg-blue-500 rounded"
+            onPress={() => {
+              setSettlingGroup(item);
+              setSettleModalVisible(true);
+            }}
+          >
+            <ThemedText className="text-white text-center">{t('Settle Up')}</ThemedText>
+          </TouchableOpacity>
+        )}
+        
+        <ThemedText className="mt-2 font-bold">{t('SettlementHistory')}:</ThemedText>
+        {item.settlements.map((settlement, index) => (
+          <View key={index} className="ml-2 mt-1">
+            <ThemedText>{t('Date')}: {new Date(settlement.date).toLocaleDateString()}</ThemedText>
+            <ThemedText>{t('Amount')}: ₹{settlement.amount.toFixed(2)}</ThemedText>
+            <ThemedText>{t('Remarks')}: {settlement.remarks}</ThemedText>
+          </View>
+        ))}
+
+        <ThemedText className="mt-2 font-bold">{t('Activities')}:</ThemedText>
+        {item.activities.map((activity, index) => (
+          <View key={index} className="ml-2 mt-1">
+            <ThemedText>{activity.landName} - {activity.activity}</ThemedText>
+            <ThemedText>{activity.landInAcres} Acres</ThemedText>
+            <ThemedText>{t('Date')}: {activity.date.toLocaleDateString()}</ThemedText>
+            <ThemedText>{t('Amount')}: ₹{activity.totalAmount.toFixed(2)}</ThemedText>
+
+            <View className="flex-row justify-end">
               <TouchableOpacity 
-                className="p-4 border-b border-gray-100"
+                className="p-2 mr-2"
+                onPress={() => editActivity(activity)}
+              >
+                <ThemedText className="text-blue-600">{t('Edit')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                className="p-2"
                 onPress={() => {
-                  setSettlingActivity(item);
-                  setSettleModalVisible(true);
-                  setOpenMenuId(null);
+                  Alert.alert(
+                    t('ConfirmDeletion'),
+                    t('AreYouSureDelete'),
+                    [
+                      { text: t('Cancel'), style: 'cancel' },
+                      { 
+                        text: t('Delete'), 
+                        style: 'destructive', 
+                        onPress: () => {
+                          if (activity.$id) deleteActivity(activity.$id);
+                        }
+                      }
+                    ]
+                  );
                 }}
               >
-                <ThemedText className="text-center">Settle Up</ThemedText>
+                <ThemedText className="text-red-600">{t('Delete')}</ThemedText>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity 
-              className="p-4"
-              onPress={() => {
-                Alert.alert(
-                  'Confirm Deletion',
-                  'Are you sure you want to delete this activity?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Delete', 
-                      style: 'destructive', 
-                      onPress: () => {
-                        if (item.$id) deleteActivity(item.$id);
-                        setOpenMenuId(null);
-                      }
-                    }
-                  ]
-                );
-              }}
-            >
-              <ThemedText className="text-red-600 text-center">Delete</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-        )}
-      </View>
-    </ThemedView>
-  )}return null;
-};
+            </View>
+          </View>
+        ))}
+      </ThemedView>
+    </Collapsible>
+  );
 
   return (
     <ThemedView className="flex-1 p-4 mt-7">
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
+      <ThemedTextInput
+        placeholder={t('FilterByName')}
+        value={filterName}
+        onChangeText={setFilterName}
+        className="mb-3 border rounded-lg p-2"
+      />
       <TouchableOpacity
         className="p-3 bg-blue-500 rounded-md mb-4"
         onPress={() => setModalVisible(true)}
       >
-        <ThemedText className="text-white text-center">Add Land Activity</ThemedText>
+        <ThemedText className="text-white text-center">{t('AddLandActivity')}</ThemedText>
       </TouchableOpacity>
 
       <Modal visible={isModalVisible} transparent={true} animationType="slide">
@@ -340,25 +499,25 @@ function LandActivitiesTracker() {
         >
           <ThemedView className="bg-white rounded-t-2xl p-6 shadow-2xl">
             <ThemedTextInput
-              placeholder="Name"
+              placeholder={t('Name')}
               value={name}
               onChangeText={setName}
               className="mb-3 border rounded-lg p-2"
             />
             <ThemedTextInput
-              placeholder="Land Name"
+              placeholder={t('LandName')}
               value={landName}
               onChangeText={setLandName}
               className="mb-3 border rounded-lg p-2"
             />
             <ThemedTextInput
-              placeholder="Activity Description"
+              placeholder={t('ActivityDescription')}
               value={activity}
               onChangeText={setActivity}
               className="mb-3 border rounded-lg p-2"
             />
             <ThemedTextInput
-              placeholder="Land in Acres"
+              placeholder={t('LandInAcres')}
               value={landInAcres}
               onChangeText={(value) => {
                 setLandInAcres(value);
@@ -368,7 +527,7 @@ function LandActivitiesTracker() {
               className="mb-3 border rounded-lg p-2"
             />
             <ThemedTextInput
-              placeholder="Amount per Acre"
+              placeholder={t('AmountPerAcre')}
               value={amountPerAcre}
               onChangeText={(value) => {
                 setAmountPerAcre(value);
@@ -377,13 +536,13 @@ function LandActivitiesTracker() {
               keyboardType="numeric"
               className="mb-3 border rounded-lg p-2"
             />
-            <ThemedText className="mb-3">Total Amount: ₹{totalAmount}</ThemedText>
+            <ThemedText className="mb-3">{t('Total Amount')}: ₹{totalAmount}</ThemedText>
 
             <TouchableOpacity
               onPress={() => setDatePickerVisible(true)}
               className="p-2 mb-4 bg-blue-600 rounded-md"
             >
-              <ThemedText className="text-center">Select Date: {selectedDate.toLocaleDateString()}</ThemedText>
+              <ThemedText className="text-center">{t('Select Date')}: {selectedDate.toLocaleDateString()}</ThemedText>
             </TouchableOpacity>
 
             {isDatePickerVisible && (
@@ -404,14 +563,14 @@ function LandActivitiesTracker() {
               className="p-3 bg-green-500 rounded-md mb-2"
             >
               <ThemedText className="text-white text-center">
-                {editingActivity ? 'Update Activity' : 'Save Activity'}
+                {editingActivity ? t('Update Activity') : t('Save Activity')}
               </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={resetForm}
               className="p-3 bg-red-500 rounded-md"
             >
-              <ThemedText className="text-white text-center">Cancel</ThemedText>
+              <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
             </TouchableOpacity>
           </ThemedView>
         </KeyboardAvoidingView>
@@ -423,52 +582,84 @@ function LandActivitiesTracker() {
           className="flex-1 justify-end"
         >
           <ThemedView className="bg-white rounded-t-2xl p-6 shadow-2xl">
-            <ThemedText className="text-lg font-bold mb-4">Settle Up Land Activity</ThemedText>
-            <ThemedText className="mb-2">Remaining Amount to be paid: ₹{settlingActivity ? (settlingActivity.totalAmount - settlingActivity.settledAmount).toFixed(2) : '0'}</ThemedText>
+            <ThemedText className="text-lg font-bold mb-4">{t('SettleUpGroup')}</ThemedText>
+            <ThemedText className="mb-2">{t('RemainingAmount')}: ₹{settlingGroup ? (settlingGroup.totalAmount - settlingGroup.settledAmount).toFixed(2) : '0'}</ThemedText>
             <ThemedTextInput
-              placeholder="Amount to Settle"
+              placeholder={t('AmountToSettle')}
               value={settleAmount}
               onChangeText={setSettleAmount}
               keyboardType="numeric"
               className="mb-3 border rounded-lg p-2"
             />
+            <ThemedTextInput
+              placeholder={t('Remarks')}
+              value={settleRemarks}
+              onChangeText={setSettleRemarks}
+              className="mb-3 border rounded-lg p-2"
+            />
+            <TouchableOpacity
+              onPress={() => setSettlementDatePickerVisible(true)}
+              className="p-2 mb-4 bg-blue-600 rounded-md"
+            >
+              <ThemedText className="text-center">{t('SelectSettlementDate')}: {settlementDate.toLocaleDateString()}</ThemedText>
+            </TouchableOpacity>
+
+            {isSettlementDatePickerVisible && (
+              <DateTimePicker
+                mode="date"
+                value={settlementDate}
+                onChange={(event, date) => {
+                  if (date) {
+                    setSettlementDate(date);
+                  }
+                  setSettlementDatePickerVisible(false);
+                }}
+              />
+            )}
+
             <TouchableOpacity
               onPress={() => {
-                if (settlingActivity && parseFloat(settleAmount) > 0) {
-                  settleUpLand(settlingActivity, parseFloat(settleAmount));
+                if (settlingGroup && parseFloat(settleAmount) > 0) {
+                  settleUpGroup(settlingGroup, parseFloat(settleAmount), settleRemarks);
                   setSettleModalVisible(false);
                   setSettleAmount('');
-                  setSettlingActivity(null);
+                  setSettleRemarks('');
+                  setSettlingGroup(null);
+                  setSettlementDate(new Date());
                 } else {
-                  Alert.alert('Invalid Amount', 'Please enter a valid amount to settle.');
+                  Alert.alert(t('InvalidInput'), t('EnterValidAmount'));
                 }
               }}
               className="p-3 bg-green-500 rounded-md mb-2"
             >
-              <ThemedText className="text-white text-center">Confirm Settlement</ThemedText>
+              <ThemedText className="text-white text-center">{t('ConfirmSettlement')}</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setSettleModalVisible(false);
                 setSettleAmount('');
-                setSettlingActivity(null);
+                setSettleRemarks('');
+                setSettlingGroup(null);
+                setSettlementDate(new Date());
               }}
               className="p-3 bg-red-500 rounded-md"
             >
-              <ThemedText className="text-white text-center">Cancel</ThemedText>
+              <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
             </TouchableOpacity>
           </ThemedView>
         </KeyboardAvoidingView>
       </Modal>
 
       <FlatList
-        data={groupedActivities}
-        renderItem={renderActivity}
-        keyExtractor={(item) => item.$id || item.name}
-        onScrollBeginDrag={() => setOpenMenuId(null)}
+        data={groupedActivities.filter(group => 
+          filterName === '' || group.name.toLowerCase().includes(filterName.toLowerCase())
+        )}
+        renderItem={renderGroupedActivity}
+        keyExtractor={(item) => item.name}
       />
     </ThemedView>
   );
 }
 
 export default LandActivitiesTracker;
+

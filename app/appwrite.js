@@ -6,7 +6,8 @@ const config = {
   projectId: '674beb99002624b2878a',
   databaseId: '674bfb6f002b0cf2318e',
   loansCollectionId: '674bfb910029ff56a7a1',
-  landActivitiesCollectionId: '674d808b00204dc07c32'
+  landActivitiesCollectionId: '674d808b00204dc07c32',
+  groupSettlementsCollectionId: '67501bac0010cfaaa670',
 };
 
 const client = new Client()

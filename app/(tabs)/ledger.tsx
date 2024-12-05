@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedTextInput } from '@/components/ThemedTextInput';
 import { Entypo } from '@expo/vector-icons'; // Make sure to install @expo/vector-icons
+import { useTranslation } from 'react-i18next';
 import { StatusBar } from 'expo-status-bar';
 import { Collapsible } from '@/components/Collapsible';
 
@@ -30,6 +31,7 @@ interface Transaction {
 }
 
 function LoanTransactions() {
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [currentTransactionType, setCurrentTransactionType] = useState<'given' | 'taken'>('given');
@@ -41,7 +43,7 @@ function LoanTransactions() {
   // State for edit functionality
   const [isEditing, setIsEditing] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-
+  const { t } = useTranslation();
   // State for three-dot menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
    useEffect(() => {
@@ -230,7 +232,7 @@ function LoanTransactions() {
         <Collapsible title={item.name}>
           {/* <ThemedText className="font-bold text-lg mb-1">{item.name}</ThemedText> */}
           <ThemedView className="flex-col pr-20">
-          <ThemedText className="text-gray-600">Initial Amount: ₹{item.amount}</ThemedText>
+          <ThemedText className="text-gray-600">{t('Initial Amount')}: ₹{item.amount}</ThemedText>
           <ThemedText className="text-gray-600">Current Amount: ₹{item.currentAmount.toFixed(2)}</ThemedText>
           <ThemedText className="text-gray-600">Interest Rate: {item.rateOfInterest}%</ThemedText>
           <ThemedText className="text-gray-600">Days Elapsed: {item.daysElapsed}</ThemedText>

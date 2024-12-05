@@ -1,7 +1,7 @@
 {
 
       "name": "పేరు",
-      "amount": "మొత్తం",
+      "Amount": "మొత్తం",
       "date": "తేదీ",
       "edit": "సవరించు",
       "delete": "తొలగించు",
@@ -22,14 +22,14 @@
       "amountPerAcre": "ఎకరానికి మొత్తం",
       "totalAmount": "మొత్తం మొత్తం",
       "settledAmount": "పరిష్కరించిన మొత్తం",
-      "status": "స్థితి",
-      "pending": "పెండింగ్",
-      "settled": "పరిష్కరించబడింది",
+      "Status": "స్థితి",
+      "Pending": "పెండింగ్‌లో ఉంది",
+      "Settled": "జమచేయబడింది",
 
       "Loans": "అప్పులు",
       "addGivenLoan": "ఇచ్చిన అప్పు జోడించండి",
       "addTakenLoan": "తీసుకున్న అప్పు జోడించండి",
-      "initialAmount": "ప్రారంభ మొత్తం",
+      "Initial Amount": "ప్రారంభ మొత్తం",
       "currentAmount": "ప్రస్తుత మొత్తం",
       "interestRate": "వడ్డీ రేటు",
       "daysElapsed": "గడిచిన రోజులు",
@@ -38,10 +38,14 @@
       "taken": "తీసుకున్నారు",
 
       "title": "పరిష్కరించు",
-      "remainingAmount": "మిగిలిన మొత్తం",
-      "amountToSettle": "పరిష్కరించవలసిన మొత్తం",
-      "fullySettled": "పూర్తిగా పరిష్కరించబడింది",
-      "partialSettlement": "పాక్షిక పరిష్కారం నమోదు చేయబడింది"
+      "Total Amount": "పూర్తిగాఇవ్వవలిసిన మొత్తం",
+      "Settled Amount":"జమచేయసిన మొత్తం",
+      "Remaining Amount": "ఇంకా ఇవ్వవలసిన మొత్తం",
+      "Fully Settled": "పూర్తిగా జమచేయబడింది",
+      "Partial Settlement": "పాక్షిక జమ నమోదు చేయబడింది",
+
+      "Madhavi":"మాధవి",
+      "Venkataswamy":"వెంకటస్వామి"
     
   }
   
