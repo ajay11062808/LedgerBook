@@ -75,7 +75,7 @@ export default function TabLayout() {
         name="ledger"
         options={{
           title: t('Loans'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="menu" color={color} />,
         }}
       />
     </Tabs>

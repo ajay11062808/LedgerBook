@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Alert,
-  TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform
-} from 'react-native';
-import { databases, config, ID } from '../appwrite'; // Ensure correct import path
+import { View, FlatList, TouchableOpacity, Modal, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { databases, config, ID, Query } from '../appwrite';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedTextInput } from '@/components/ThemedTextInput';
-import { Entypo } from '@expo/vector-icons'; // Make sure to install @expo/vector-icons
+import { Entypo } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { StatusBar } from 'expo-status-bar';
-import { Collapsible } from '@/components/Collapsible';
+import { LoadingOverlay } from '@/components/landactivity/Loading';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 interface Transaction {
   $id?: string;
@@ -30,30 +22,47 @@ interface Transaction {
   daysElapsed: number;
 }
 
-function LoanTransactions() {
+interface GroupedTransaction {
+  name: string;
+  totalGiven: number;
+  totalTaken: number;
+  transactions: Transaction[];
+}
 
+function LoanTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [groupedTransactions, setGroupedTransactions] = useState<GroupedTransaction[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [currentTransactionType, setCurrentTransactionType] = useState<'given' | 'taken'>('given');
-  
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [rateOfInterest, setRateOfInterest] = useState('');
-
-  // State for edit functionality
   const [isEditing, setIsEditing] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isCalculationModalVisible, setCalculationModalVisible] = useState(false);
+  const [calculationDate, setCalculationDate] = useState(new Date());
+  const [calculatedAmount, setCalculatedAmount] = useState(0);
+
   const { t } = useTranslation();
-  // State for three-dot menu
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-   useEffect(() => {
+
+  useEffect(() => {
     fetchTransactions();
-    const intervalId = setInterval(calculateDailyInterest, 86400000); // Daily update
-    return () => clearInterval(intervalId);
+    const dailyIntervalId = setInterval(calculateDailyInterest, 86400000); // Daily update
+    return () => clearInterval(dailyIntervalId);
   }, []);
+
+  useEffect(() => {
+    groupTransactions();
+  }, [transactions]);
 
   const fetchTransactions = async () => {
     try {
+      setIsLoading(true);
+      setLoadingMessage(t('Loading Transactions'));
       const response = await databases.listDocuments(
         config.databaseId, 
         config.loansCollectionId
@@ -71,20 +80,47 @@ function LoanTransactions() {
       setTransactions(fetchedTransactions);
     } catch (error) {
       console.error('Error fetching transactions', error);
+      Alert.alert(t('Error'), t('Failed To Fetch Transactions'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
     }
   };
 
-  const calculateDailyInterest = () => {
-    const updatedTransactions = transactions.map(transaction => {
-      const today = new Date();
-      const initialDate = transaction.initialDate;
-      const daysElapsed = Math.floor((today.getTime() - initialDate.getTime()) / (1000 * 3600 * 24));
-      
-      // Daily interest calculation
-      const dailyInterestRate = transaction.rateOfInterest / 365;
-      const interestAccrued = transaction.amount * (dailyInterestRate / 100) * daysElapsed;
-      const currentAmount = transaction.amount + interestAccrued;
+  const groupTransactions = () => {
+    const grouped = transactions.reduce((acc, transaction) => {
+      const existingGroup = acc.find(group => group.name === transaction.name);
+      if (existingGroup) {
+        if (transaction.type === 'given') {
+          existingGroup.totalGiven += transaction.currentAmount;
+        } else {
+          existingGroup.totalTaken += transaction.currentAmount;
+        }
+        existingGroup.transactions.push(transaction);
+      } else {
+        acc.push({
+          name: transaction.name,
+          totalGiven: transaction.type === 'given' ? transaction.currentAmount : 0,
+          totalTaken: transaction.type === 'taken' ? transaction.currentAmount : 0,
+          transactions: [transaction]
+        });
+      }
+      return acc;
+    }, [] as GroupedTransaction[]);
+    setGroupedTransactions(grouped);
+  };
 
+  const calculateInterest = (transaction: Transaction, daysElapsed: number) => {
+    const dailyInterestRate = transaction.rateOfInterest / 365;
+    const interestAccrued = transaction.amount * (dailyInterestRate / 100) * daysElapsed;
+    return transaction.amount + interestAccrued;
+  };
+
+  const calculateDailyInterest = async () => {
+    const today = new Date();
+    const updatedTransactions = transactions.map(transaction => {
+      const daysElapsed = Math.floor((today.getTime() - transaction.initialDate.getTime()) / (1000 * 3600 * 24));
+      const currentAmount = calculateInterest(transaction, daysElapsed);
       return {
         ...transaction,
         currentAmount: parseFloat(currentAmount.toFixed(2)),
@@ -93,7 +129,7 @@ function LoanTransactions() {
     });
 
     setTransactions(updatedTransactions);
-    updateTransactionsInDatabase(updatedTransactions);
+    await updateTransactionsInDatabase(updatedTransactions);
   };
 
   const updateTransactionsInDatabase = async (updatedTransactions: Transaction[]) => {
@@ -118,83 +154,121 @@ function LoanTransactions() {
 
   const addTransaction = async () => {
     if (!name || !amount || !rateOfInterest) {
-      Alert.alert('Validation Error', 'Please fill all fields');
+      Alert.alert(t('ValidationError'), t('Please Fill All Fields'));
       return;
     }
 
     try {
-      if (isEditing && editingTransaction?.$id) {
-        // Update existing transaction
-        const updatedTransaction: Transaction = {
-          ...editingTransaction,
-          name,
-          amount: parseFloat(amount),
-          rateOfInterest: parseFloat(rateOfInterest),
-        };
+      setIsLoading(true);
+      setLoadingMessage(isEditing ? t('UpdatingTransaction') : t('AddingTransaction'));
 
+      const transactionData = {
+        type: currentTransactionType,
+        name,
+        amount: parseFloat(amount),
+        rateOfInterest: parseFloat(rateOfInterest),
+        initialDate: selectedDate.toISOString(),
+        currentAmount: parseFloat(amount),
+        daysElapsed: 0
+      };
+
+      if (isEditing && editingTransaction?.$id) {
         await databases.updateDocument(
           config.databaseId,
           config.loansCollectionId,
           editingTransaction.$id,
-          {
-            name,
-            amount: parseFloat(amount),
-            rateOfInterest: parseFloat(rateOfInterest),
-          }
+          transactionData
         );
-
-        // Update local state
-        setTransactions(transactions.map(t => 
-          t.$id === editingTransaction.$id ? updatedTransaction : t
-        ));
       } else {
-        // Create new transaction
-        const newTransaction: Omit<Transaction, '$id'> = {
-          type: currentTransactionType,
-          name,
-          amount: parseFloat(amount),
-          rateOfInterest: parseFloat(rateOfInterest),
-          initialDate: new Date(),
-          currentAmount: parseFloat(amount),
-          daysElapsed: 0
-        };
-
-        const response = await databases.createDocument(
+        await databases.createDocument(
           config.databaseId,
           config.loansCollectionId,
           ID.unique(),
-          newTransaction
+          transactionData
         );
-
-        // Update local state
-        setTransactions([
-          ...transactions, 
-          { ...newTransaction, $id: response.$id }
-        ]);
       }
 
-      // Reset form
+      await fetchTransactions();
       resetForm();
     } catch (error) {
       console.error('Error saving transaction', error);
-      Alert.alert('Error', 'Failed to save transaction');
+      Alert.alert(t('Error'), t('FailedToSaveTransaction'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
     }
   };
 
-  const deleteTransaction = async (transactionId: string) => {
+  const deleteTransaction = async (id: string) => {
     try {
-      // Delete from Appwrite database
+      setIsLoading(true);
+      setLoadingMessage(t('DeletingTransaction'));
       await databases.deleteDocument(
         config.databaseId,
         config.loansCollectionId,
-        transactionId
+        id
       );
-
-      // Update local state
-      setTransactions(transactions.filter(t => t.$id !== transactionId));
+      await fetchTransactions();
     } catch (error) {
       console.error('Error deleting transaction', error);
-      Alert.alert('Error', 'Failed to delete transaction');
+      Alert.alert(t('Error'), t('FailedToDeleteTransaction'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
+  };
+
+  const editTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setCurrentTransactionType(transaction.type);
+    setName(transaction.name);
+    setAmount(transaction.amount.toString());
+    setRateOfInterest(transaction.rateOfInterest.toString());
+    setSelectedDate(transaction.initialDate);
+    setIsEditing(true);
+    setModalVisible(true);
+  };
+
+  const settleTransaction = async (transaction: Transaction) => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage(t('Settling Transaction'));
+      const settledAmount = calculateInterest(transaction, transaction.daysElapsed);
+      
+      await databases.updateDocument(
+        config.databaseId,
+        config.loansCollectionId,
+        transaction.$id!,
+        {
+          amount: 0,
+          currentAmount: 0,
+          daysElapsed: 0,
+          initialDate: new Date().toISOString()
+        }
+      );
+      
+      await fetchTransactions();
+      Alert.alert(t('TransactionSettled'), `${t('SettledAmount')}: ${settledAmount.toFixed(2)}`);
+    } catch (error) {
+      console.error('Error settling transaction', error);
+      Alert.alert(t('Error'), t('FailedToSettleTransaction'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
+  };
+
+  const calculateAmountForDate = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setCalculationDate(new Date());
+    setCalculationModalVisible(true);
+  };
+
+  const performCalculation = () => {
+    if (editingTransaction) {
+      const daysElapsed = Math.floor((calculationDate.getTime() - editingTransaction.initialDate.getTime()) / (1000 * 3600 * 24));
+      const calculatedAmount = calculateInterest(editingTransaction, daysElapsed);
+      setCalculatedAmount(calculatedAmount);
     }
   };
 
@@ -202,178 +276,245 @@ function LoanTransactions() {
     setName('');
     setAmount('');
     setRateOfInterest('');
-    setModalVisible(false);
+    setSelectedDate(new Date());
     setIsEditing(false);
     setEditingTransaction(null);
+    setModalVisible(false);
   };
 
-  const startEditTransaction = (transaction: Transaction) => {
-    setIsEditing(true);
-    setEditingTransaction(transaction);
-    setName(transaction.name);
-    setAmount(transaction.amount.toString());
-    setRateOfInterest(transaction.rateOfInterest.toString());
-    setCurrentTransactionType(transaction.type);
-    setModalVisible(true);
-    setOpenMenuId(null); // Close the three-dot menu
+  const exportToCSV = async () => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage(t('Exporting To CSV'));
+
+      let csvContent = "Name,Type,Amount,Current Amount,Interest Rate,Initial Date,Days Elapsed\n";
+
+      groupedTransactions.forEach(group => {
+        group.transactions.forEach(transaction => {
+          csvContent += `${group.name},${transaction.type},${transaction.amount},${transaction.currentAmount},${transaction.rateOfInterest},${transaction.initialDate},${transaction.daysElapsed}\n`;
+        });
+      });
+
+      const fileName = `LedgerBookExport_${new Date().toISOString()}.csv`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(filePath, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath);
+      } else {
+        Alert.alert(t('Export Success'), t('CSVSavedTo') + filePath);
+      }
+    } catch (error) {
+      console.error('Error exporting to CSV', error);
+      Alert.alert(t('Error'), t('Failed To Export CSV'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
   };
 
-  const toggleMenu = (itemId: string | null) => {
-    setOpenMenuId(prevId => prevId === itemId ? null : itemId);
-    
-  };
-
-  const renderTransaction = ({ item }: { item: Transaction }) => {
-    const isGiven = item.type === 'given';
-
-    return (
-      <ThemedView style={{ backgroundColor: isGiven ? '#86e33e' : '#ff4444' }}
-        className={`rounded mb-2 p-3 flex-row justify-between items-start`}>
-        <Collapsible title={item.name}>
-          {/* <ThemedText className="font-bold text-lg mb-1">{item.name}</ThemedText> */}
-          <ThemedView className="flex-col pr-20">
-          <ThemedText className="text-gray-600">{t('Initial Amount')}: ₹{item.amount}</ThemedText>
-          <ThemedText className="text-gray-600">Current Amount: ₹{item.currentAmount.toFixed(2)}</ThemedText>
-          <ThemedText className="text-gray-600">Interest Rate: {item.rateOfInterest}%</ThemedText>
-          <ThemedText className="text-gray-600">Days Elapsed: {item.daysElapsed}</ThemedText>
-          <ThemedText  className={'font-semibold'}>
-            Type: {item.type}
-          </ThemedText>
-          </ThemedView>
-        </Collapsible>
-        
-        <View className="relative">
-          <TouchableOpacity 
-            className="p-2"
-            onPress={() => toggleMenu(item.$id ?? null)}
-          >
-            <Entypo name="dots-three-vertical" size={20} className="text-gray-700" />
-          </TouchableOpacity>
-          
-          {openMenuId === item.$id && (
-            <ThemedView 
-              className="absolute top-10 right-0 bg-white rounded-lg shadow-lg z-10 w-36"
-            >
-              <TouchableOpacity 
-                className="p-4 border-b border-gray-100"
-                onPress={() => startEditTransaction(item)}
-              >
-                <ThemedText className="text-center">Edit</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                className="p-4"
-                onPress={() => {
-                  Alert.alert(
-                    'Confirm Deletion',
-                    'Are you sure you want to delete this transaction?',
-                    [
-                      { 
-                        text: 'Cancel', 
-                        style: 'cancel' 
-                      },
-                      { 
-                        text: 'Delete', 
-                        style: 'destructive', 
-                        onPress: () => {
-                          if (item.$id) deleteTransaction(item.$id);
-                          setOpenMenuId(null);
-                        }
-                      }
-                    ]
-                  );
-                }}
-              >
-                <ThemedText className="text-red-600 text-center">Delete</ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          )}
-        </View>
-      </ThemedView>
-    );
-  };
+  const renderGroupedTransaction = ({ item }: { item: GroupedTransaction }) => (
+    <ThemedView className="p-4 mb-4 rounded-lg bg-muted">
+      <ThemedText className="text-xl font-bold">{item.name}</ThemedText>
+      <ThemedText className="text-lg text-green-600">{t('TotalGiven')}: {item.totalGiven?item.totalGiven.toFixed(2):0.00}</ThemedText>
+      <ThemedText className="text-lg text-red-600">{t('TotalTaken')}: {item.totalTaken?item.totalTaken.toFixed(2):0.00}</ThemedText>
+      {item.transactions.map((transaction, index) => (
+        <ThemedView key={transaction.$id} className={`mt-2 p-2 rounded ${transaction.type === 'given' ? 'bg-green-100' : 'bg-red-100'}`}>
+          <ThemedText>{t('Type')}: {transaction.type === 'given' ? t('Given') : t('Taken')}</ThemedText>
+          <ThemedText>{t('Amount')}: {transaction.amount}</ThemedText>
+          <ThemedText>{t('CurrentAmount')}: {transaction.currentAmount.toFixed(2)}</ThemedText>
+          <ThemedText>{t('InterestRate')}: {transaction.rateOfInterest}%</ThemedText>
+          <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
+          <ThemedText>{t('DaysElapsed')}: {transaction.daysElapsed}</ThemedText>
+          <View className="flex-row justify-between mt-2">
+            <TouchableOpacity onPress={() => editTransaction(transaction)} className="bg-blue-500 p-2 rounded">
+              <ThemedText className="text-white">{t('Edit')}</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                            className="bg-red-500 p-2 rounded"
+                            onPress={() => {
+                              Alert.alert(
+                                t('Confirm Deletion'),
+                                t('Are You Sure To Delete'),
+                                [
+                                  { text: t('Cancel'), style: 'cancel' },
+                                  { 
+                                    text: t('Delete'), 
+                                    style: 'destructive', 
+                                    onPress: () => {
+                                      deleteTransaction(transaction.$id!);
+                                    }
+                                  }
+                                ]
+                              );
+                            }}
+                          >
+                            <ThemedText className="text-red-600">{t('Delete')}</ThemedText>
+                          </TouchableOpacity>
+            <TouchableOpacity onPress={() => settleTransaction(transaction)} className="bg-green-500 p-2 rounded">
+              <ThemedText className="text-white">{t('Settle')}</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => calculateAmountForDate(transaction)} className="bg-yellow-500 p-2 rounded">
+              <ThemedText className="text-white">{t('Calculate')}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ThemedView>
+      ))}
+    </ThemedView>
+  );
 
   return (
-    <ThemedView className="flex-1 p-3 mt-8">
-      <ThemedView className="flex-row justify-between mb-3">
+    <ThemedView className="flex-1 p-4">
+      <View className="flex-row justify-between mb-4">
         <TouchableOpacity 
-          className="bg-blue-300 p-3 rounded-lg flex-1 mr-2"
           onPress={() => {
             setCurrentTransactionType('given');
             setModalVisible(true);
-          }}
+          }} 
+          className="bg-green-500 p-4 rounded flex-1 mr-2"
         >
-          <ThemedText className='text-center'>Add Given Loan</ThemedText>
+          <ThemedText className="text-center text-white">{t('Add Given')}</ThemedText>
         </TouchableOpacity>
         <TouchableOpacity 
-          className="bg-red-300 p-3 rounded-lg flex-1 ml-2"
           onPress={() => {
             setCurrentTransactionType('taken');
             setModalVisible(true);
-          }}
+          }} 
+          className="bg-red-300 p-4 rounded flex-1 ml-2"
         >
-          <ThemedText className="text-center">Add Taken Loan</ThemedText>
+          <ThemedText className="text-center text-white">{t('Add Taken')}</ThemedText>
         </TouchableOpacity>
-      </ThemedView>
+      </View>
 
-      <Modal
-        visible={isModalVisible}
-        transparent={true}
-        animationType="slide"
+      <TouchableOpacity 
+        onPress={exportToCSV} 
+        className="bg-purple-500 p-4 rounded mb-4"
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1 justify-end"
+        <ThemedText className="text-center text-white">{t('ExportToCSV')}</ThemedText>
+      </TouchableOpacity>
+
+      <FlatList
+        data={groupedTransactions}
+        renderItem={renderGroupedTransaction}
+        keyExtractor={(item) => item.name}
+      />
+
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 justify-center"
         >
-          <ThemedView className="bg-white rounded-t-2xl p-6 shadow-2xl">
-            <ThemedTextInput
-              className="border border-gray-300 p-3 rounded-lg mb-4"
-              placeholder="Name"
-              value={name}
-              onChangeText={setName}
-            />
-            <ThemedTextInput
-              className="border border-gray-300 p-3 rounded-lg mb-4"
-              placeholder="Amount"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-            />
-            <ThemedTextInput
-              className="border border-gray-300 p-3 rounded-lg mb-4"
-              placeholder="Rate of Interest"
-              value={rateOfInterest}
-              onChangeText={setRateOfInterest}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity 
-              className="bg-blue-500 p-4 rounded-lg mb-2"
-              onPress={addTransaction}
-            >
-              <ThemedText className="text-white text-center">
-                {isEditing ? 'Update Transaction' : 'Save Transaction'}
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <ThemedView className="bg-background m-4 p-4 rounded-lg">
+              <ThemedText className="text-xl font-bold mb-4">
+                {isEditing ? t('Edit Transaction') : t('Add New Transaction')}
               </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              className="bg-red-500 p-4 rounded-lg"
-              onPress={() => {
-                resetForm();
-                setModalVisible(false);
-              }}
-            >
-              <ThemedText className="text-center">Cancel</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
+              <ThemedTextInput
+                placeholder={t('Name')}
+                value={name}
+                onChangeText={setName}
+                className="mb-3 border rounded-lg p-2"
+              />
+              <ThemedTextInput
+                placeholder={t('Amount')}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="numeric"
+                className="mb-3 border rounded-lg p-2"
+              />
+              <ThemedTextInput
+                placeholder={t('InterestRate')}
+                value={rateOfInterest}
+                onChangeText={setRateOfInterest}
+                keyboardType="numeric"
+                className="mb-3 border rounded-lg p-2"
+              />
+              <TouchableOpacity
+                onPress={() => setDatePickerVisible(true)}
+                className="p-2 mb-4 bg-blue-600 rounded-md"
+              >
+                <ThemedText className="text-center">
+                  {t('SelectDate')}: {selectedDate.toLocaleDateString()}
+                </ThemedText>
+              </TouchableOpacity>
+              {isDatePickerVisible && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display="default"
+                  onChange={(event, date) => {
+                    setDatePickerVisible(false);
+                    if (date) setSelectedDate(date);
+                  }}
+                />
+              )}
+              <TouchableOpacity onPress={addTransaction} className="bg-green-500 p-3 rounded-md mb-2">
+                <ThemedText className="text-white text-center">
+                  {isEditing ? t('UpdateTransaction') : t('AddTransaction')}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={resetForm} className="bg-red-500 p-3 rounded-md">
+                <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      <FlatList 
-        data={transactions}
-        renderItem={renderTransaction}
-        keyExtractor={(item) => item.$id || Date.now().toString()}
-        onScrollBeginDrag={() => setOpenMenuId(null)}
-      />
+      <Modal visible={isCalculationModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 justify-center"
+        >
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <ThemedView className="bg-background m-4 p-4 rounded-lg">
+            <ThemedText className="text-xl font-bold mb-4">{t('CalculateAmount')}</ThemedText>
+            <TouchableOpacity
+              onPress={() => setDatePickerVisible(true)}
+              className="p-2 mb-4 bg-blue-600 rounded-md"
+            >
+              <ThemedText className="text-center">
+                {t('SelectDate')}: {calculationDate.toLocaleDateString()}
+              </ThemedText>
+            </TouchableOpacity>
+            {isDatePickerVisible && (
+              <DateTimePicker
+                value={calculationDate}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setDatePickerVisible(false);
+                  if (date) setCalculationDate(date);
+                }}
+              />
+            )}
+            <TouchableOpacity onPress={performCalculation} className="bg-green-500 p-3 rounded-md mb-2">
+              <ThemedText className="text-white text-center">{t('Calculate')}</ThemedText>
+            </TouchableOpacity>
+            {calculatedAmount > 0 && (
+              <ThemedText className="text-lg mt-4">
+                {t('CalculatedAmount')}: {calculatedAmount.toFixed(2)}
+              </ThemedText>
+            )}
+            <TouchableOpacity 
+              onPress={() => {
+                setCalculationModalVisible(false);
+                setCalculatedAmount(0);
+              }} 
+              className="bg-red-500 p-3 rounded-md mt-4"
+            >
+              <ThemedText className="text-white text-center">{t('Close')}</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
     </ThemedView>
   );
-};
+}
 
 export default LoanTransactions;
+

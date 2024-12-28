@@ -11,14 +11,17 @@ const MAPPING = {
   // See SF Symbols in the SF Symbols app on Mac.
   'house.fill': 'home',
   'paperplane.fill': 'send',
+  'ledger.fill':'library-books',
+  'menu':'menu-book',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
-} as Partial<
-  Record<
-    import('expo-symbols').SymbolViewProps['name'],
-    React.ComponentProps<typeof MaterialIcons>['name']
-  >
->;
+} as any;
+//Partial<
+//   Record<
+//     import('expo-symbols').SymbolViewProps['name'],
+//     React.ComponentProps<typeof MaterialIcons>['name']
+//   >
+// >;
 
 export type IconSymbolName = keyof typeof MAPPING;
 
@@ -39,5 +42,6 @@ export function IconSymbol({
   style?: StyleProp<ViewStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  const iconName = MAPPING[name] || name;
+  return <MaterialIcons color={color} size={size} name={iconName as any} style={style} />;//
 }
