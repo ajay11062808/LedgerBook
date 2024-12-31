@@ -414,7 +414,7 @@ function LandActivitiesTracker() {
         
         {!item.isSettled && (
           <TouchableOpacity 
-            className="mt-2 p-2 bg-blue-500 rounded"
+            className="mt-2 p-2 bg-purple-500 rounded"
             onPress={() => {
               setSettlingGroup(item);
               setSettleModalVisible(true);
@@ -424,7 +424,7 @@ function LandActivitiesTracker() {
           </TouchableOpacity>
         )}
         
-        <ThemedText className="mt-2 font-bold">{t('SettlementHistory')}:</ThemedText>
+        <ThemedText className="mt-2 font-bold">{t('Settlement History')}:</ThemedText>
         {item.settlements.map((settlement, index) => (
           <View key={index} className="ml-2 mt-1">
             <ThemedText>{t('Date')}: {new Date(settlement.date).toLocaleDateString()}</ThemedText>
@@ -443,17 +443,17 @@ function LandActivitiesTracker() {
 
             <View className="flex-row justify-end">
               <TouchableOpacity 
-                className="p-2 mr-2"
+                className="p-2 mr-2 bg-blue-500 rounded-md"
                 onPress={() => editActivity(activity)}
               >
                 <ThemedText className="text-blue-600">{t('Edit')}</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity 
-                className="p-2"
+                className="p-2 bg-red-500"
                 onPress={() => {
                   Alert.alert(
-                    t('ConfirmDeletion'),
-                    t('AreYouSureDelete'),
+                    t('Confirm Deletion'),
+                    t('Are You Sure To Delete'),
                     [
                       { text: t('Cancel'), style: 'cancel' },
                       { 
