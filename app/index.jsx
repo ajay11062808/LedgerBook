@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   background: {
+    marginTop:35,
     position: 'absolute',
     width,
     height,
@@ -109,21 +110,21 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   contentContainer: {
-    marginTop:210,
+    marginTop:160,
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     padding: 20,
     borderRadius: 20,
     width: width * 0.9,
+    height: height * 0.23,
     alignItems: 'center',
     overflow: 'hidden',
   },
   textContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   title: {
-    marginTop:20,
     fontSize: 36,
     fontWeight: 'bold',
     color: '#4A3D1C',
@@ -132,6 +133,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   subtitle: {
+    marginTop:10,
     fontSize: 18,
     color: '#65562D',
     textAlign: 'center',
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 40,
     borderRadius: 30,
-    marginTop: 20,
+    marginTop: 0,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: {

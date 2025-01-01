@@ -181,7 +181,6 @@ const styles = StyleSheet.create({
   },
   itemDetails: {
     fontSize: 14,
-    color: '#ddd',
   },
   emptyText: {
     textAlign: 'center',

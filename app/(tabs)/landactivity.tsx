@@ -17,7 +17,8 @@ import { ThemedTextInput } from '@/components/ThemedTextInput';
 import { Entypo } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/Collapsible';
-import {LoadingOverlay} from '../../components/landactivity/Loading'
+import {LoadingOverlay} from '../../components/landactivity/Loading';
+import { Picker } from '@react-native-picker/picker';
 
 interface Settlement {
   date: string;
@@ -75,12 +76,13 @@ function LandActivitiesTracker() {
   const [settlingGroup, setSettlingGroup] = useState<GroupedActivity | null>(null);
   const [settlementDate, setSettlementDate] = useState(new Date());
   const [filterName, setFilterName] = useState('');
- 
+  const [customActivity, setCustomActivity] = useState(''); // Separate state for custom input
+
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
   const { t } = useTranslation();
-
+  const existingActivities: string[]=[t("Gorru"),t("Balam Mandhu"),t("Vithanalu"),t("Nagali"),t("Matti tolakam")];
   useEffect(() => {
     fetchActivities();
   }, []);
@@ -197,7 +199,8 @@ function LandActivitiesTracker() {
   };
 
   const addOrEditActivity = async () => {
-    if (!name || !landName || !activity || !landInAcres) {
+    const activityToSave = activity === 'new' ? customActivity : activity;
+    if (!name ||!landName || (!activityToSave) || !landInAcres) {
       Alert.alert(t('ValidationError'), t('PleaseAllFields'));
       return;
     }
@@ -211,7 +214,8 @@ function LandActivitiesTracker() {
       const activityData = {
         name,
         landName,
-        activity,
+        // activity: activity === 'new' ? '' : activity,
+        activity: activityToSave,
         date: selectedDate.toISOString(),
         landInAcres: parseFloat(landInAcres),
         amountPerAcre: parseFloat(amountPerAcre),
@@ -402,11 +406,23 @@ function LandActivitiesTracker() {
       setLoadingMessage('');
     }
   };
-
+  function convertAcresToDisplay(acres: number): string {
+    const wholeAcres = Math.floor(acres);
+    const cents = Math.round((acres - wholeAcres) * 100);
+  
+    if (wholeAcres === 0) {
+      return `${cents} ${t('cents')}`;
+    } else if (cents === 0) {
+      return `${wholeAcres} ${wholeAcres > 1 ? t('acres') : t('acre')}`;
+    } else {
+      return `${wholeAcres} ${wholeAcres > 1 ? t('acres') : t('acre')} ${cents} ${t('cents')}`;
+    }
+  }
+  
   const renderGroupedActivity = ({ item }: { item: GroupedActivity }) => (
-    <Collapsible title={item.name}>
+    <Collapsible title={t(item.name)}>
       <ThemedView style={{backgroundColor: item.isSettled ? "#9c8686" : "#86e33e"}} className={'rounded mb-2 p-3'}>
-        <ThemedText className="text-lg font-bold">{item.name}</ThemedText>
+        <ThemedText className="text-lg font-bold">{t(item.name)}</ThemedText>
         <ThemedText>{t('Total Amount')}: ₹{item.totalAmount.toFixed(2)}</ThemedText>
         <ThemedText>{t('Settled Amount')}: ₹{item.settledAmount.toFixed(2)}</ThemedText>
         <ThemedText>{t('Remaining Amount')}: ₹{(item.totalAmount - item.settledAmount).toFixed(2)}</ThemedText>
@@ -436,10 +452,11 @@ function LandActivitiesTracker() {
         <ThemedText className="mt-2 font-bold">{t('Activities')}:</ThemedText>
         {item.activities.map((activity, index) => (
           <View key={index} className="ml-2 mt-1">
-            <ThemedText>{activity.landName} - {activity.activity}</ThemedText>
-            <ThemedText>{activity.landInAcres} Acres</ThemedText>
+            <ThemedText>{t(activity.landName)} - {t(activity.activity)}</ThemedText>
+            <ThemedText>{convertAcresToDisplay(activity.landInAcres)}</ThemedText>
+            <ThemedText>{t('Amount Per Acre')}:{activity.amountPerAcre}</ThemedText>
             <ThemedText>{t('Date')}: {activity.date.toLocaleDateString()}</ThemedText>
-            <ThemedText>{t('Amount')}: ₹{activity.totalAmount.toFixed(2)}</ThemedText>
+            <ThemedText>{t('Total Rate')}: ₹{activity.totalAmount.toFixed(2)}</ThemedText>
 
             <View className="flex-row justify-end">
               <TouchableOpacity 
@@ -477,7 +494,7 @@ function LandActivitiesTracker() {
   );
 
   return (
-    <ThemedView className="flex-1 p-4 mt-7">
+    <ThemedView className="flex-1 p-4 mt-1">
       {isLoading && <LoadingOverlay message={loadingMessage} />}
       <ThemedTextInput
         placeholder={t('FilterByName')}
@@ -510,12 +527,45 @@ function LandActivitiesTracker() {
               onChangeText={setLandName}
               className="mb-3 border rounded-lg p-2"
             />
-            <ThemedTextInput
+            {/* <ThemedTextInput
               placeholder={t('ActivityDescription')}
               value={activity}
               onChangeText={setActivity}
               className="mb-3 border rounded-lg p-2"
-            />
+            /> */}
+            <View className="mb-3">
+                <ThemedText className="mb-1">{t('ActivityDescription')}</ThemedText>
+                <View className="flex-row">
+                  <View className="flex-1 mr-2">
+                    <Picker
+                      selectedValue={activity}
+                      onValueChange={(itemValue) => {
+                        setActivity(itemValue);
+                        if (itemValue !== 'new') {
+                          setCustomActivity(''); // Reset custom input when a predefined activity is selected
+                        }
+                      }}
+                      style={{ backgroundColor: 'white', color: 'black' }}
+                    >
+                      <Picker.Item label={t('Select Activity')} value="" />
+                      {existingActivities.map((existingName, index) => (
+                        <Picker.Item key={index} label={existingName} value={existingName} />
+                      ))}
+                      <Picker.Item label={t('Enter New Activity')} value="new" />
+                    </Picker>
+                  </View>
+                  {activity === 'new' && (
+                    <View className="flex-1 ml-2">
+                      <ThemedTextInput
+                        placeholder={t('Enter New Activity')}
+                        value={customActivity} // Bind custom input state
+                        onChangeText={(text) => setCustomActivity(text)}
+                        className="border rounded-lg p-2"
+                      />
+                    </View>
+                  )}
+                </View>
+              </View>
             <ThemedTextInput
               placeholder={t('LandInAcres')}
               value={landInAcres}

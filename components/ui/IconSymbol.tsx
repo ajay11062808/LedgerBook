@@ -13,6 +13,7 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'ledger.fill':'library-books',
   'menu':'menu-book',
+  'land':'agriculture',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
 } as any;

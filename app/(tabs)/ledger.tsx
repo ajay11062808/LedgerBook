@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
+  Text,
+  Image,
   FlatList,
   TouchableOpacity,
   Modal,
@@ -68,11 +70,13 @@ export default function LoanTransactions() {
   const [settlingTransaction, setSettlingTransaction] = useState<Transaction | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settleRemarks, setSettleRemarks] = useState('');
+  const [customName, setCustomName] = useState('');
+
 
   useEffect(() => {
     fetchTransactions();
+    calculateDailyInterest();
   }, []);
-
   const fetchTransactions = async () => {
     try {
       setIsLoading(true);
@@ -134,9 +138,13 @@ export default function LoanTransactions() {
   };
 
   const calculateInterest = (transaction: Transaction, daysElapsed: number) => {
-    const dailyInterestRate = (transaction.rateOfInterest*12) / 365;
-    const interestAccrued = transaction.amount * (dailyInterestRate / 100) * daysElapsed;
-    return transaction.amount + interestAccrued;
+    const years= Math.floor(daysElapsed / 365);
+    const days= daysElapsed % 365;
+    const dailyInterestRate = (transaction.rateOfInterest) / 30;
+    const interestAccrued = transaction.amount * (dailyInterestRate / 100) * days;
+    const dailyInterestRate1 = (transaction.rateOfInterest*12);
+    const interestAccrued1 = transaction.amount * (dailyInterestRate1 / 100) * years;
+    return transaction.amount + interestAccrued+interestAccrued1;
   };
 
   const formatElapsedTime = (days: number) => {
@@ -146,7 +154,7 @@ export default function LoanTransactions() {
     return `${years > 0 ? `${years} ${t('years')} ` : ''}${months > 0 ? `${months} ${t('months')} ` : ''}${remainingDays} ${t('days')}`;
   };
 
-  const calculateDailyInterest = async () => {
+  const calculateDailyInterest = useCallback(async () => {
     const today = new Date();
     const updatedTransactions = transactions.map(transaction => {
       if (!transaction.isSettled) {
@@ -163,7 +171,8 @@ export default function LoanTransactions() {
 
     setTransactions(updatedTransactions);
     await updateTransactionsInDatabase(updatedTransactions);
-  };
+  }, [transactions]);
+
 
   const updateTransactionsInDatabase = async (updatedTransactions: Transaction[]) => {
     for (const transaction of updatedTransactions) {
@@ -186,7 +195,8 @@ export default function LoanTransactions() {
   };
 
   const addTransaction = async () => {
-    if (!name || !amount || !rateOfInterest) {
+    const nameToSave = name === 'new' ? customName : name;
+    if ((!nameToSave) || !amount || !rateOfInterest) {
       Alert.alert(t('ValidationError'), t('Please Fill All Fields'));
       return;
     }
@@ -197,7 +207,7 @@ export default function LoanTransactions() {
 
       const transactionData = {
         type: currentTransactionType,
-        name,
+        name: nameToSave, // Handle 'new' name case
         amount: parseFloat(amount),
         rateOfInterest: parseFloat(rateOfInterest),
         initialDate: selectedDate.toISOString(),
@@ -393,16 +403,21 @@ export default function LoanTransactions() {
     <Collapsible title={item.name}>
       <ThemedView className="mb-4 p-4 bg-card rounded-lg">
         <ThemedText className="text-xl font-bold">{item.name}</ThemedText>
-        <ThemedText>{t('Total Given')}: ₹{item.totalGiven.toFixed(2)}</ThemedText>
-        <ThemedText>{t('Total Taken')}: ₹{item.totalTaken.toFixed(2)}</ThemedText>
+        <ThemedText  style={{color: 'green'}}>{t('Total Given')}: ₹{item.totalGiven.toFixed(2)}</ThemedText>
+        <ThemedText style={{color:'red'}}>{t('Total Taken')}: ₹{item.totalTaken.toFixed(2)}</ThemedText>
 
         <Collapsible title={t('Active Transactions')}>
           {item.transactions.filter(t => !t.isSettled).map((transaction, index) => (
             <ThemedView key={index} className="mt-2 p-2 bg-muted rounded">
               {/* Existing transaction details */}
-              <ThemedText>{t('Type')}: {transaction.type}</ThemedText>
-              <ThemedText>{t('Amount')}: {transaction.amount}</ThemedText>
-              <ThemedText>{t('CurrentAmount')}: {transaction.currentAmount.toFixed(2)}</ThemedText>
+              <ThemedText  style={{
+                color: transaction.type === 'given' ? 'green' : 'red',
+              }}>{t('Type')}: {transaction.type}</ThemedText>
+              <ThemedText style={{
+                color: transaction.type === 'given' ? 'green' : 'red',
+              }}>{t('Amount')}: ₹{transaction.amount}</ThemedText>
+              <ThemedText>{t('InterestAmount')}: ₹{(transaction.currentAmount-transaction.amount).toFixed(2)}</ThemedText>
+              <ThemedText>{t('CurrentAmount')}: ₹{transaction.currentAmount.toFixed(2)}</ThemedText>
               <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
               <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
               <ThemedText>{t('DaysElapsed')}: {formatElapsedTime(transaction.daysElapsed)}</ThemedText>
@@ -448,7 +463,9 @@ export default function LoanTransactions() {
         <Collapsible title={t('Settled Transactions')}>
           {item.transactions.filter(t => t.isSettled).map((transaction, index) => (
             <ThemedView key={index} className="mt-2 p-2 bg-muted rounded">
-              <ThemedText>{t('Type')}: {transaction.type}</ThemedText>
+              <ThemedText  style={{
+                color: transaction.type === 'given' ? 'green' : 'red',
+              }}>{t('Type')}: {transaction.type}</ThemedText>
               <ThemedText>{t('InitialAmount')}: {transaction.amount}</ThemedText>
               <ThemedText>{t('SettledAmount')}: {transaction.currentAmount.toFixed(2)}</ThemedText>
               <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
@@ -462,10 +479,17 @@ export default function LoanTransactions() {
       </ThemedView>
     </Collapsible>
   );
-
+  const updateAllTransactions = async () => {
+    setIsLoading(true);
+    setLoadingMessage(t('UpdatingTransactions'));
+    await calculateDailyInterest();
+    await fetchTransactions();
+    setIsLoading(false);
+    setLoadingMessage('');
+  };
   return (
     <ThemedView className="flex-1 p-4">
-      <View className="flex-row justify-between mb-4">
+      <View className="flex-row justify-between mb-3">
         <TouchableOpacity
           onPress={() => {
             setCurrentTransactionType('given');
@@ -486,13 +510,95 @@ export default function LoanTransactions() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        onPress={exportToCSV}
-        className="bg-purple-500 p-4 rounded mb-4"
-      >
-        <ThemedText className="text-center text-white">{t('ExportToCSV')}</ThemedText>
-      </TouchableOpacity>
+ <View style={{ marginVertical: 10 }}>
+  {/* <View
+    style={{
+      backgroundColor: '#FFEFD5',
+      padding: 10,
+      borderRadius: 10,
+      marginBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+    }}
+  >
+    <Image
+      source={require('../../assets/images/Booklogo.png')} // Add a reminder icon in your assets folder
+      style={{ width: 20, height: 20, marginRight: 10 }}
+    />
+    <Text style={{ color: '#8B0000', fontSize: 14, fontWeight: 'bold' }}>
+      Don’t forget to update transactions daily to keep data accurate!
+    </Text>
+  </View>  */}
 
+  {/* Buttons in a Row */}
+  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+    {/* Update All Transactions Button */}
+    <TouchableOpacity
+      // onPress={() => {
+      //   Alert.alert(
+      //     'Update Transactions',
+      //     'Updating transactions will refresh the days elapsed for each loan. Are you sure you want to proceed?',
+      //     [
+      //       { text: 'Cancel', style: 'cancel' },
+      //       { text: 'Update', onPress: updateAllTransactions },
+      //     ]
+      //   );
+      // }}
+      onPress={updateAllTransactions}
+      style={{
+        flex: 1,
+        backgroundColor: '#1E90FF',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+        marginRight: 10,
+        alignItems: 'center',
+        flexDirection: 'row',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+      }}
+    >
+      <Image
+        source={require('../../assets/images/update.jpg')} // Add an update icon in your assets folder
+        style={{ width: 30, height: 30, marginRight: 8 }}
+      />
+      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+        {t('Update All')}
+      </Text>
+    </TouchableOpacity>
+
+    {/* Export to CSV Button */}
+    <TouchableOpacity
+      onPress={exportToCSV}
+      style={{
+        flex: 1,
+        backgroundColor: '#6A0DAD',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+        marginLeft: 10,
+        alignItems: 'center',
+        flexDirection: 'row',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+      }}
+    >
+      <Image
+        source={require('../../assets/images/exportcsv.png')} // Add an export icon in your assets folder
+        style={{ width: 30, height: 30, marginRight: 8 }}
+      />
+      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+        {t('Export CSV')}
+      </Text>
+    </TouchableOpacity>
+  </View>
+</View>
       {/* <ThemedText>Debug: {groupedTransactions.length} grouped transactions</ThemedText> */}
 
       <FlatList
@@ -516,25 +622,37 @@ export default function LoanTransactions() {
               </ThemedText>
               <View className="mb-3">
                 <ThemedText className="mb-1">{t('Name')}</ThemedText>
-                <Picker
-                  selectedValue={name}
-                  onValueChange={(itemValue) => setName(itemValue)}
-                  style={{ backgroundColor: 'white', color: 'black' }}
-                >
-                  <Picker.Item label={t('Select Name')} value="" />
-                  {existingNames.map((existingName, index) => (
-                    <Picker.Item key={index} label={existingName} value={existingName} />
-                  ))}
-                </Picker>
+                <View className="flex-row">
+                  <View className="flex-1 mr-2">
+                    <Picker
+                      selectedValue={name}
+                      onValueChange={(itemValue) => {
+                        setName(itemValue);
+                        if (itemValue !== 'new') {
+                          setCustomName(''); // Reset custom input when a predefined name is selected
+                        }
+                      }}
+                      style={{ backgroundColor: 'white', color: 'black' }}
+                    >
+                      <Picker.Item label={t('Select Name')} value="" />
+                      {existingNames.map((existingName, index) => (
+                        <Picker.Item key={index} label={existingName} value={existingName} />
+                      ))}
+                      <Picker.Item label={t('Enter New Name')} value="new" />
+                    </Picker>
+                  </View>
+                  {name === 'new' && (
+                    <View className="flex-1 ml-2">
+                      <ThemedTextInput
+                        placeholder={t('Enter New Name')}
+                        value={customName}
+                        onChangeText={(text) => setCustomName(text)} 
+                        className="border rounded-lg p-2"
+                      />
+                    </View>
+                  )}
+                </View>
               </View>
-              {name === '' && (
-                <ThemedTextInput
-                  placeholder={t('Or Enter New Name')}
-                  value={name}
-                  onChangeText={setName}
-                  className="mb-3 border rounded-lg p-2"
-                />
-              )}
               <ThemedTextInput
                 placeholder={t('Amount')}
                 value={amount}
@@ -671,4 +789,5 @@ export default function LoanTransactions() {
     </ThemedView>
   );
 }
+
 
