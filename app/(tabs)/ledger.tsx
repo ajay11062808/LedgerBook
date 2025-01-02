@@ -137,33 +137,64 @@ export default function LoanTransactions() {
     setGroupedTransactions(grouped);
   };
 
-  const calculateInterest = (transaction: Transaction, daysElapsed: number) => {
-    const years= Math.floor(daysElapsed / 365);
-    const days= daysElapsed % 365;
+  const calculateInterest = (transaction: Transaction, endDate: Date) => {
+    const { years, months, days } = calculateElapsedTime(transaction.initialDate, endDate);
     const dailyInterestRate = (transaction.rateOfInterest) / 30;
-    const interestAccrued = transaction.amount * (dailyInterestRate / 100) * days;
-    const dailyInterestRate1 = (transaction.rateOfInterest*12);
-    const interestAccrued1 = transaction.amount * (dailyInterestRate1 / 100) * years;
-    return transaction.amount + interestAccrued+interestAccrued1;
+    const monthlyInterestRate = transaction.rateOfInterest;
+    const yearlyInterestRate = transaction.rateOfInterest * 12;
+
+    const interestAccruedDays = transaction.amount * (dailyInterestRate / 100) * days;
+    const interestAccruedMonths = transaction.amount * (monthlyInterestRate / 100) * months;
+    const interestAccruedYears = transaction.amount * (yearlyInterestRate / 100) * years;
+
+    return transaction.amount + interestAccruedDays + interestAccruedMonths + interestAccruedYears;
   };
 
-  const formatElapsedTime = (days: number) => {
-    const years = Math.floor(days / 365);
-    const months = Math.floor((days % 365) / 30);
-    const remainingDays = days % 30;
-    return `${years > 0 ? `${years} ${t('years')} ` : ''}${months > 0 ? `${months} ${t('months')} ` : ''}${remainingDays} ${t('days')}`;
+  const calculateElapsedTime = (startDate: Date, endDate: Date) => {
+    const isLeapYear = (year: number) =>
+      (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+
+    const daysInMonth = (year: number, month: number) => {
+      return new Date(year, month + 1, 0).getDate();
+    };
+
+    let years = endDate.getFullYear() - startDate.getFullYear();
+    let months = endDate.getMonth() - startDate.getMonth();
+    let days = endDate.getDate() - startDate.getDate();
+
+    if (days < 0) {
+      months -= 1;
+      const prevMonthDays = daysInMonth(
+        endDate.getFullYear(),
+        endDate.getMonth() - 1
+      );
+      days += prevMonthDays;
+    }
+
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+
+    return { years, months, days };
+  };
+
+  const formatElapsedTime = (startDate: Date, endDate: Date) => {
+    const { years, months, days } = calculateElapsedTime(startDate, endDate);
+    return `${years > 0 ? `${years} ${t('years')} ` : ''}${months > 0 ? `${months} ${t('months')} ` : ''}${days} ${t('days')}`;
   };
 
   const calculateDailyInterest = useCallback(async () => {
     const today = new Date();
     const updatedTransactions = transactions.map(transaction => {
       if (!transaction.isSettled) {
-        const daysElapsed = Math.floor((today.getTime() - transaction.initialDate.getTime()) / (1000 * 3600 * 24));
-        const currentAmount = calculateInterest(transaction, daysElapsed);
+        const currentAmount = calculateInterest(transaction, today);
+        const { years, months, days } = calculateElapsedTime(transaction.initialDate, today);
+        const totalDays = years * 365 + months * 30 + days;
         return {
           ...transaction,
           currentAmount: parseFloat(currentAmount.toFixed(2)),
-          daysElapsed
+          daysElapsed: totalDays
         };
       }
       return transaction;
@@ -300,16 +331,16 @@ export default function LoanTransactions() {
       );
 
       // Update the total given/taken amount for the group
-      setGroupedTransactions(prevGroups => 
+      setGroupedTransactions(prevGroups =>
         prevGroups.map(group => {
           if (group.name === settlingTransaction.name) {
             return {
               ...group,
-              totalGiven: settlingTransaction.type === 'given' 
-                ? group.totalGiven - settlingTransaction.currentAmount + settledAmount 
+              totalGiven: settlingTransaction.type === 'given'
+                ? group.totalGiven - settlingTransaction.currentAmount + settledAmount
                 : group.totalGiven,
-              totalTaken: settlingTransaction.type === 'taken' 
-                ? group.totalTaken - settlingTransaction.currentAmount + settledAmount 
+              totalTaken: settlingTransaction.type === 'taken'
+                ? group.totalTaken - settlingTransaction.currentAmount + settledAmount
                 : group.totalTaken,
             };
           }
@@ -324,7 +355,7 @@ export default function LoanTransactions() {
         `${t('SettledAmount')}: ${settledAmount.toFixed(2)}\n` +
         `${t('InitialAmount')}: ${settlingTransaction.amount.toFixed(2)}\n` +
         `${t('InterestAmount')}: ${(settledAmount - settlingTransaction.amount).toFixed(2)}\n` +
-        `${t('TimeElapsed')}: ${formatElapsedTime(settlingTransaction.daysElapsed)}\n` +
+        `${t('TimeElapsed')}: ${formatElapsedTime(settlingTransaction.initialDate, new Date())}\n` +
         `${t('Remarks')}: ${settleRemarks}`
       );
     } catch (error) {
@@ -345,8 +376,9 @@ export default function LoanTransactions() {
 
   const performCalculation = () => {
     if (editingTransaction) {
-      const daysElapsed = Math.floor((calculationDate.getTime() - editingTransaction.initialDate.getTime()) / (1000 * 3600 * 24));
-      const calculatedAmount = calculateInterest(editingTransaction, daysElapsed);
+      const { years, months, days } = calculateElapsedTime(editingTransaction.initialDate, calculationDate);
+      const totalDays = years * 365 + months * 30 + days;
+      const calculatedAmount = calculateInterest(editingTransaction, calculationDate);
       const interestAmount = calculatedAmount - editingTransaction.amount;
       setCalculatedAmount(calculatedAmount);
       Alert.alert(
@@ -354,7 +386,7 @@ export default function LoanTransactions() {
         `${t('CalculatedAmount')}: ${calculatedAmount.toFixed(2)}\n` +
         `${t('InitialAmount')}: ${editingTransaction.amount.toFixed(2)}\n` +
         `${t('InterestAmount')}: ${interestAmount.toFixed(2)}\n` +
-        `${t('TimeElapsed')}: ${formatElapsedTime(daysElapsed)}`
+        `${t('TimeElapsed')}: ${formatElapsedTime(editingTransaction.initialDate, calculationDate)}`
       );
     }
   };
@@ -400,9 +432,9 @@ export default function LoanTransactions() {
   };
 
   const renderGroupedTransaction = ({ item }: { item: GroupedTransaction }) => (
-    <Collapsible title={item.name}>
+    <Collapsible title={t(item.name)}>
       <ThemedView className="mb-4 p-4 bg-card rounded-lg">
-        <ThemedText className="text-xl font-bold">{item.name}</ThemedText>
+        <ThemedText className="text-xl font-bold">{t(item.name)}</ThemedText>
         <ThemedText  style={{color: 'green'}}>{t('Total Given')}: ₹{item.totalGiven.toFixed(2)}</ThemedText>
         <ThemedText style={{color:'red'}}>{t('Total Taken')}: ₹{item.totalTaken.toFixed(2)}</ThemedText>
 
@@ -415,12 +447,12 @@ export default function LoanTransactions() {
               }}>{t('Type')}: {transaction.type}</ThemedText>
               <ThemedText style={{
                 color: transaction.type === 'given' ? 'green' : 'red',
-              }}>{t('Amount')}: ₹{transaction.amount}</ThemedText>
+              }}>{t('InitialAmount')}: ₹{transaction.amount}</ThemedText>
               <ThemedText>{t('InterestAmount')}: ₹{(transaction.currentAmount-transaction.amount).toFixed(2)}</ThemedText>
               <ThemedText>{t('CurrentAmount')}: ₹{transaction.currentAmount.toFixed(2)}</ThemedText>
               <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
               <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
-              <ThemedText>{t('DaysElapsed')}: {formatElapsedTime(transaction.daysElapsed)}</ThemedText>
+              <ThemedText>{t('DaysElapsed')}: {formatElapsedTime(transaction.initialDate, new Date())}</ThemedText>
               <ThemedText>{t('Status')}: {t('Pending')}</ThemedText>
 
               {/* Action buttons */}
@@ -471,7 +503,7 @@ export default function LoanTransactions() {
               <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
               <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
               <ThemedText>{t('SettledDate')}: {transaction.settledDate?.toLocaleDateString()}</ThemedText>
-              <ThemedText>{t('TimeElapsed')}: {formatElapsedTime(transaction.daysElapsed)}</ThemedText>
+              <ThemedText>{t('TimeElapsed')}: {formatElapsedTime(transaction.initialDate, transaction.settledDate!) }</ThemedText>
               <ThemedText>{t('Remarks')}: {transaction.remarks}</ThemedText>
             </ThemedView>
           ))}
@@ -534,16 +566,6 @@ export default function LoanTransactions() {
   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
     {/* Update All Transactions Button */}
     <TouchableOpacity
-      // onPress={() => {
-      //   Alert.alert(
-      //     'Update Transactions',
-      //     'Updating transactions will refresh the days elapsed for each loan. Are you sure you want to proceed?',
-      //     [
-      //       { text: 'Cancel', style: 'cancel' },
-      //       { text: 'Update', onPress: updateAllTransactions },
-      //     ]
-      //   );
-      // }}
       onPress={updateAllTransactions}
       style={{
         flex: 1,
@@ -646,7 +668,7 @@ export default function LoanTransactions() {
                       <ThemedTextInput
                         placeholder={t('Enter New Name')}
                         value={customName}
-                        onChangeText={(text) => setCustomName(text)} 
+                        onChangeText={(text) => setCustomName(text)}
                         className="border rounded-lg p-2"
                       />
                     </View>
@@ -774,8 +796,8 @@ export default function LoanTransactions() {
               <TouchableOpacity onPress={settleTransaction} className="bg-green-500 p-3 rounded-md">
                 <ThemedText className="text-white text-center">{t('Settle')}</ThemedText>
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => setIsSettleModalVisible(false)} 
+              <TouchableOpacity
+                onPress={() => setIsSettleModalVisible(false)}
                 className="bg-red-500 p-3 rounded-md mt-2"
               >
                 <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
@@ -789,5 +811,4 @@ export default function LoanTransactions() {
     </ThemedView>
   );
 }
-
 

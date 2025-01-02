@@ -9,12 +9,14 @@ import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useAnimations } from '../../hooks/useAnimations';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const navigation = useNavigation();
+  const { isTeluguEnabled, toggleLanguage } = useLanguage();
 
 
   const { fadeAnim, scaleAnim, fadeIn } = useAnimations();
@@ -56,10 +58,10 @@ export default function HomeScreen() {
     }
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'te' : 'en';
-    i18n.changeLanguage(newLang);
-  };
+  // const toggleLanguage = () => {
+  //   const newLang = i18n.language === 'en' ? 'te' : 'en';
+  //   i18n.changeLanguage(newLang);
+  // };
 
   const renderSearchResult = ({ item }) => (
     <Animated.View style={[styles.resultItem, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
@@ -107,7 +109,7 @@ export default function HomeScreen() {
         </ThemedView>
         <TouchableOpacity onPress={toggleLanguage} style={styles.languageToggle}>
           <ThemedText style={styles.languageToggleText}>
-            {i18n.language === 'en' ? 'Switch to Telugu' : 'ఆంగ్లానికి మారండి'}
+          {isTeluguEnabled ? 'Switch to English' : 'తెలుగుకి మారండి'}
           </ThemedText>
         </TouchableOpacity>
         <FlatList

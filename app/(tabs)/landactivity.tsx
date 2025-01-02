@@ -20,6 +20,7 @@ import { Collapsible } from '@/components/Collapsible';
 import {LoadingOverlay} from '../../components/landactivity/Loading';
 import { Picker } from '@react-native-picker/picker';
 
+
 interface Settlement {
   date: string;
   amount: number;
@@ -441,13 +442,13 @@ function LandActivitiesTracker() {
         )}
         
         <ThemedText className="mt-2 font-bold">{t('Settlement History')}:</ThemedText>
-        {item.settlements.map((settlement, index) => (
-          <View key={index} className="ml-2 mt-1">
-            <ThemedText>{t('Date')}: {new Date(settlement.date).toLocaleDateString()}</ThemedText>
-            <ThemedText>{t('Amount')}: ₹{settlement.amount.toFixed(2)}</ThemedText>
-            <ThemedText>{t('Remarks')}: {settlement.remarks}</ThemedText>
-          </View>
-        ))}
+      {[...item.settlements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((settlement, index) => (
+        <View key={index} className="ml-2 mt-1 mb-4">
+          <ThemedText>{t('SettledDate')}: {new Date(settlement.date).toLocaleDateString()}</ThemedText>
+          <ThemedText>{t('Amount')}: ₹{settlement.amount.toFixed(2)}</ThemedText>
+          <ThemedText>{t('Remarks')}: {settlement.remarks}</ThemedText>
+        </View>
+      ))}
 
         <ThemedText className="mt-2 font-bold">{t('Activities')}:</ThemedText>
         {item.activities.map((activity, index) => (
@@ -491,6 +492,7 @@ function LandActivitiesTracker() {
         ))}
       </ThemedView>
     </Collapsible>
+    
   );
 
   return (

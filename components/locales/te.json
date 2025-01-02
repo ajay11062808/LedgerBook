@@ -15,6 +15,7 @@
 
 
       "LandActivity": "భూమి కార్యకలాపాలు",
+      "Activities":"భూమి కార్యకలాపాలు",
       "addActivity": "భూమి కార్యకలాపాన్ని జోడించండి",
       "landName": "భూమి పేరు",
       "activity": "కార్యకలాపం",
@@ -29,22 +30,32 @@
       "settledAmount": "పరిష్కరించిన మొత్తం",
       "Status": "స్థితి",
       "Pending": "పెండింగ్‌లో ఉంది",
+      "Remarks": "గుర్తుకోసం వ్యాఖ్యలు",
       "Settled": "జమచేయబడింది",
 
-      "Loans": "అప్పులు",
-      "addGivenLoan": "ఇచ్చిన అప్పు జోడించండి",
-      "addTakenLoan": "తీసుకున్న అప్పు జోడించండి",
-      "Initial Amount": "ప్రారంభ మొత్తం",
-      "currentAmount": "ప్రస్తుత మొత్తం",
-      "interestRate": "వడ్డీ రేటు",
-      "daysElapsed": "గడిచిన రోజులు",
+      "Loans": "ఋణాలు",
+      "Add Given": "ఇచ్చిన ఋణాన్ని జోడించండి",
+      "Add Taken": "తీసుకున్న ఋణాన్ని జోడించండి",
+      "InitialDate": "ప్రారంభ తేదీ",
+      "InitialAmount": "ప్రారంభ మొత్తం",
+      "InterestAmount": "వడ్డీ మొత్తం",
+      "CurrentAmount": "ప్రస్తుత మొత్తం",
+      "InterestRate": "వడ్డీ రేటు",
+      "DaysElapsed": "గడిచిన రోజులు",
+      "TimeElapsed": "గడిచిన రోజులు",
+      "years": "సంవత్సరాలు",
+      "months": "నెలలు",
+      "days": "రోజులు",
       "type": "రకం",
       "given": "ఇచ్చారు",
       "taken": "తీసుకున్నారు",
 
       "title": "పరిష్కరించు",
+      "Settlement History":"జమచేసిన చరిత్ర",
       "Total Amount": "పూర్తిగాఇవ్వవలిసిన మొత్తం",
+      "SettledAmount":"జమచేసిన మొత్తం",
       "Settled Amount":"జమచేసిన మొత్తం",
+      "SettledDate":"జమచేసిన తేదీ",
       "Remaining Amount": "ఇంకా ఇవ్వవలసిన మొత్తం",
       "Fully Settled": "పూర్తిగా జమచేయబడింది",
       "Partial Settlement": "పాక్షిక జమ నమోదు చేయబడింది",
@@ -56,6 +67,7 @@
 
       "Madhavi":"మాధవి",
       "Venkataswamy":"వెంకటస్వామి"
+
       
     
   }
