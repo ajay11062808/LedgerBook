@@ -9,6 +9,8 @@ import '../globals.css'
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+import { LanguageProvider } from '../contexts/LanguageContext';
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -29,6 +31,7 @@ export default function RootLayout() {
   }
 
   return (
+    <LanguageProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -40,16 +43,17 @@ export default function RootLayout() {
             presentation: 'modal'
           }} 
         />
-        <Stack.Screen 
-          name="AddActivity" 
+        {/* <Stack.Screen 
+          name="PersonLedgerDetails" 
           options={{ 
-            title: 'Add Activity',
+            title: 'Person Ledger Details',
             presentation: 'modal'
           }} 
-        />
+        /> */}
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+    </LanguageProvider>
   );
 }

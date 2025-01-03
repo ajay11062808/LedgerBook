@@ -811,4 +811,3 @@ export default function LoanTransactions() {
     </ThemedView>
   );
 }
-

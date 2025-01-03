@@ -15,11 +15,13 @@
 
 
       "LandActivity": "భూమి కార్యకలాపాలు",
+      "Activity": "భూమి కార్యకలాపం",
       "Activities":"భూమి కార్యకలాపాలు",
       "addActivity": "భూమి కార్యకలాపాన్ని జోడించండి",
       "landName": "భూమి పేరు",
       "activity": "కార్యకలాపం",
       "landInAcres": "ఎకరాల్లో భూమి",
+      "Land Size": "ఎకరాల్లో భూమి",
       "cent": "సెంట్",
       "cents": "సెంట్లు",
       "acre": "ఎకరం",
@@ -54,7 +56,7 @@
       "Active Transactions":"ప్రస్తుత లావాదేవీలు",
       "Settled Transactions":"జమచేసిన లావాదేవీలు",
       "Settlement History":"జమచేసిన చరిత్ర",
-      "Total Amount": "పూర్తిగాఇవ్వవలిసిన మొత్తం",
+      "Total Amount": "పూర్తిగా ఇవ్వవలిసిన మొత్తం",
       "SettledAmount":"జమచేసిన మొత్తం",
       "Settled Amount":"జమచేసిన మొత్తం",
       "SettledDate":"జమచేసిన తేదీ",
@@ -63,12 +65,20 @@
       "Partial Settlement": "పాక్షిక జమ నమోదు చేయబడింది",
       "Gorru": "గొఱ్ఱు",
       "Balam Mandhu": "బలం మందు",
+      "Balam": "బలం మందు",
       "Vithanalu": "విత్తనాలు",
       "Nagali": "నాగలి",
       "Matti tolakam": "మట్టి తోలకం",
 
       "Madhavi":"మాధవి",
-      "Venkataswamy":"వెంకటస్వామి"
+      "Venkataswamy":"వెంకటస్వామి",
+      "Mastanrao":"మస్తాన్ రావు",
+      "Surendra Babu":"సురేంద్ర బాబు",
+      "Srinivasrao":"శ్రీనివాస్ రావు",
+      "Kumar":"కుమార్",
+      "Anjamma":"అంజమ్మ"
+      
+      
 
       
     
