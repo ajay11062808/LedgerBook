@@ -51,6 +51,8 @@
       "taken": "తీసుకున్నారు",
 
       "title": "పరిష్కరించు",
+      "Active Transactions":"ప్రస్తుత లావాదేవీలు",
+      "Settled Transactions":"జమచేసిన లావాదేవీలు",
       "Settlement History":"జమచేసిన చరిత్ర",
       "Total Amount": "పూర్తిగాఇవ్వవలిసిన మొత్తం",
       "SettledAmount":"జమచేసిన మొత్తం",

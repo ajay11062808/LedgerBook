@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/Collapsible';
 import {LoadingOverlay} from '../../components/landactivity/Loading';
 import { Picker } from '@react-native-picker/picker';
+import { useRouter } from 'expo-router';
 
 
 interface Settlement {
@@ -78,6 +79,8 @@ function LandActivitiesTracker() {
   const [settlementDate, setSettlementDate] = useState(new Date());
   const [filterName, setFilterName] = useState('');
   const [customActivity, setCustomActivity] = useState(''); // Separate state for custom input
+
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -421,6 +424,18 @@ function LandActivitiesTracker() {
   }
   
   const renderGroupedActivity = ({ item }: { item: GroupedActivity }) => (
+    <TouchableOpacity
+      onPress={() => router.push({
+        pathname: "/PersonDetails",
+        params: {
+          name: item.name,
+          totalAmount: item.totalAmount,
+          settledAmount: item.settledAmount,
+          activities: JSON.stringify(item.activities),
+          settlements: JSON.stringify(item.settlements)
+        }
+      })}
+    >
     <Collapsible title={t(item.name)}>
       <ThemedView style={{backgroundColor: item.isSettled ? "#9c8686" : "#86e33e"}} className={'rounded mb-2 p-3'}>
         <ThemedText className="text-lg font-bold">{t(item.name)}</ThemedText>
@@ -492,7 +507,7 @@ function LandActivitiesTracker() {
         ))}
       </ThemedView>
     </Collapsible>
-    
+    </TouchableOpacity>
   );
 
   return (
