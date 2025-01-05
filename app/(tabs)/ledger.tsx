@@ -18,6 +18,7 @@ interface Transaction {
   initialDate: Date;
   currentAmount: number;
   daysElapsed: number;
+  transactionRemarks : string;
   isSettled: boolean;
   settledDate?: Date;
   remarks?: string;
@@ -51,6 +52,7 @@ export default function LoanTransactions() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [remarks, setRemarks] = useState('');
+  const [transactionRemarks, setTransactionRemarks] = useState('');
   const [isSettleModalVisible, setIsSettleModalVisible] = useState(false);
   const [settlingTransaction, setSettlingTransaction] = useState<Transaction | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
@@ -81,6 +83,7 @@ export default function LoanTransactions() {
         initialDate: new Date(doc.initialDate),
         currentAmount: doc.currentAmount,
         daysElapsed: doc.daysElapsed,
+        transactionRemarks: doc.transactionRemarks,
         isSettled: doc.isSettled,
         settledDate: doc.settledDate ? new Date(doc.settledDate) : undefined,
         remarks: doc.remarks
@@ -227,6 +230,7 @@ export default function LoanTransactions() {
         initialDate: selectedDate.toISOString(),
         currentAmount: parseFloat(amount),
         daysElapsed: 0,
+        transactionRemarks: transactionRemarks,
         isSettled: false
       };
 
@@ -283,6 +287,7 @@ export default function LoanTransactions() {
     setAmount(transaction.amount.toString());
     setRateOfInterest(transaction.rateOfInterest.toString());
     setSelectedDate(transaction.initialDate);
+    setTransactionRemarks(transaction.transactionRemarks || '');
     setIsEditing(true);
     setModalVisible(true);
   };
@@ -381,6 +386,7 @@ export default function LoanTransactions() {
     setAmount('');
     setRateOfInterest('');
     setSelectedDate(new Date());
+    setTransactionRemarks('');
     setIsEditing(false);
     setEditingTransaction(null);
     setModalVisible(false);
@@ -392,11 +398,11 @@ export default function LoanTransactions() {
       setIsLoading(true);
       setLoadingMessage(t('Exporting To CSV'));
 
-      let csvContent = "Name,Type,Amount,Current Amount,Interest Rate,Initial Date,Days Elapsed,Is Settled,Settled Date,Remarks\n";
+      let csvContent = "Name,Type,Amount,Current Amount,Interest Rate,Initial Date,Days Elapsed,Transaction Remarks,Is Settled,Settled Date,Settlement Remarks\n";
 
       groupedTransactions.forEach(group => {
         group.transactions.forEach(transaction => {
-          csvContent += `${transaction.name},${transaction.type},${transaction.amount},${transaction.currentAmount},${transaction.rateOfInterest},${transaction.initialDate.toISOString()},${transaction.daysElapsed},${transaction.isSettled},${transaction.settledDate ? transaction.settledDate.toISOString() : ''},${transaction.remarks || ''}\n`;
+          csvContent += `${transaction.name},${transaction.type},${transaction.amount},${transaction.currentAmount},${transaction.rateOfInterest},${transaction.initialDate.toISOString()},${transaction.daysElapsed},${transaction.transactionRemarks},${transaction.isSettled},${transaction.settledDate ? transaction.settledDate.toISOString() : ''},${transaction.remarks || ''}\n`;
         });
       });
 
@@ -455,6 +461,7 @@ export default function LoanTransactions() {
                   <Paragraph>{t('InterestRate')}: ₹{transaction.rateOfInterest}</Paragraph>
                   <Paragraph>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</Paragraph>
                   <Paragraph>{t('DaysElapsed')}: {formatElapsedTime(transaction.initialDate, new Date())}</Paragraph>
+                  <Paragraph>{t('Transaction Remarks')}: {transaction.transactionRemarks}</Paragraph>
                   <Paragraph>{t('Status')}: {t('Pending')}</Paragraph>
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap' }}>
@@ -535,7 +542,8 @@ export default function LoanTransactions() {
                   <Paragraph>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</Paragraph>
                   <Paragraph>{t('SettledDate')}: {transaction.settledDate?.toLocaleDateString()}</Paragraph>
                   <Paragraph>{t('TimeElapsed')}: {formatElapsedTime(transaction.initialDate, transaction.settledDate!)}</Paragraph>
-                  <Paragraph>{t('Remarks')}: {transaction.remarks}</Paragraph>
+                  <Paragraph>{t('Transaction Remarks')}: {transaction.transactionRemarks}</Paragraph>
+                  <Paragraph>{t('Settlement Remarks')}: {transaction.remarks}</Paragraph>
                 </Card.Content>
               </Card>
             ))}
@@ -650,6 +658,14 @@ export default function LoanTransactions() {
               value={rateOfInterest}
               onChangeText={setRateOfInterest}
               keyboardType="numeric"
+              style={{ marginBottom: 16 }}
+            />
+            <TextInput
+              label={t('Transaction Remarks')}
+              value={transactionRemarks}
+              onChangeText={setTransactionRemarks}
+              multiline
+              numberOfLines={4}
               style={{ marginBottom: 16 }}
             />
             <Button

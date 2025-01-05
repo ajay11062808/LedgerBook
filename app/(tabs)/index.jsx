@@ -79,7 +79,7 @@ export default function HomeScreen() {
           style={styles.gradientCard}
         >
           <Image
-            source={item.type === 'loan' ? require('../../assets/images/react-logo.png') : require('../../assets/images/icon.png')}
+            source={item.type === 'loan' ? require('../../assets/images/react-logo.png') : require('../../assets/images/Booklogo.png')}
             style={styles.icon}
           />
           <ThemedView style={styles.textContainer}>
