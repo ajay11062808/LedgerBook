@@ -389,7 +389,11 @@ export default function PersonDetails() {
         {activities.map((activity: any, index: number) => (
           <Card key={index} style={styles.card}>
             <Card.Content>
-              <Text variant="titleMedium" style={styles.activityTitle}>{t(activity.landName)}</Text>
+              {/* <Text variant="titleMedium" style={styles.activityTitle}>{t(activity.landName)}</Text> */}
+              <View style={styles.row}>
+                <Text variant="bodyMedium">{t('Land Name')}:</Text>
+                <Text variant="bodyMedium" style={styles.value}>{t(activity.landName)}</Text>
+              </View>
               <View style={styles.row}>
                 <Text variant="bodyMedium">{t('Activity')}:</Text>
                 <Text variant="bodyMedium" style={styles.value}>{t(activity.activity)}</Text>
@@ -411,7 +415,7 @@ export default function PersonDetails() {
                 <Text variant="bodyMedium" style={styles.value}>₹{activity.amountPerAcre}</Text>
               </View>
               <View style={styles.row}>
-                <Text variant="bodyMedium">{t('Total Amount')}:</Text>
+                <Text variant="bodyMedium">{t('Total Rate')}:</Text>
                 <Text variant="bodyMedium" style={styles.value}>₹{activity.totalAmount}</Text>
               </View>
               

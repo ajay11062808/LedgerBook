@@ -1,29 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  FlatList,
-  TouchableOpacity,
-  Modal,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator
-} from 'react-native';
+import { View, FlatList, TouchableOpacity, Modal, Alert, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { Text, Button, Card, Title, Paragraph, TextInput, FAB, Portal, Dialog, ActivityIndicator, List, Divider } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { databases, config, ID, Query } from '../appwrite';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedTextInput } from '@/components/ThemedTextInput';
-import { Collapsible } from '@/components/Collapsible';
-import { Entypo } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { LoadingOverlay } from '@/components/landactivity/Loading';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Picker } from '@react-native-picker/picker';
+import { usePathname } from 'expo-router';
 
 interface Transaction {
   $id?: string;
@@ -48,6 +32,7 @@ interface GroupedTransaction {
 
 export default function LoanTransactions() {
   const { t } = useTranslation();
+  const pathname = usePathname();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [groupedTransactions, setGroupedTransactions] = useState<GroupedTransaction[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
@@ -71,12 +56,13 @@ export default function LoanTransactions() {
   const [settleAmount, setSettleAmount] = useState('');
   const [settleRemarks, setSettleRemarks] = useState('');
   const [customName, setCustomName] = useState('');
-
+  const [fabOpen, setFabOpen] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
     calculateDailyInterest();
   }, []);
+
   const fetchTransactions = async () => {
     try {
       setIsLoading(true);
@@ -102,8 +88,7 @@ export default function LoanTransactions() {
       setTransactions(fetchedTransactions);
       const names = [...new Set(fetchedTransactions.map(t => t.name))];
       setExistingNames(names);
-      // console.log('Fetched transactions:', fetchedTransactions); // Debug log
-      groupTransactions(fetchedTransactions); // Call groupTransactions with fetched data
+      groupTransactions(fetchedTransactions);
     } catch (error) {
       console.error('Error fetching transactions', error);
       Alert.alert(t('Error'), t('Failed To Fetch Transactions'));
@@ -133,7 +118,6 @@ export default function LoanTransactions() {
       }
       return acc;
     }, [] as GroupedTransaction[]);
-    // console.log('Grouped transactions:', grouped); // Debug log
     setGroupedTransactions(grouped);
   };
 
@@ -204,7 +188,6 @@ export default function LoanTransactions() {
     await updateTransactionsInDatabase(updatedTransactions);
   }, [transactions]);
 
-
   const updateTransactionsInDatabase = async (updatedTransactions: Transaction[]) => {
     for (const transaction of updatedTransactions) {
       if (transaction.$id && !transaction.isSettled) {
@@ -238,7 +221,7 @@ export default function LoanTransactions() {
 
       const transactionData = {
         type: currentTransactionType,
-        name: nameToSave, // Handle 'new' name case
+        name: nameToSave,
         amount: parseFloat(amount),
         rateOfInterest: parseFloat(rateOfInterest),
         initialDate: selectedDate.toISOString(),
@@ -273,6 +256,7 @@ export default function LoanTransactions() {
       setLoadingMessage('');
     }
   };
+
   const deleteTransaction = async (id: string) => {
     try {
       setIsLoading(true);
@@ -302,12 +286,14 @@ export default function LoanTransactions() {
     setIsEditing(true);
     setModalVisible(true);
   };
+
   const openSettleModal = (transaction: Transaction) => {
     setSettlingTransaction(transaction);
     setSettleAmount(transaction.currentAmount.toFixed(2));
     setSettleRemarks('');
     setIsSettleModalVisible(true);
   };
+
   const settleTransaction = async () => {
     if (!settlingTransaction) return;
 
@@ -330,7 +316,6 @@ export default function LoanTransactions() {
         }
       );
 
-      // Update the total given/taken amount for the group
       setGroupedTransactions(prevGroups =>
         prevGroups.map(group => {
           if (group.name === settlingTransaction.name) {
@@ -431,86 +416,6 @@ export default function LoanTransactions() {
     }
   };
 
-  const renderGroupedTransaction = ({ item }: { item: GroupedTransaction }) => (
-    <Collapsible title={t(item.name)}>
-      <ThemedView className="mb-4 p-4 bg-card rounded-lg">
-        <ThemedText className="text-xl font-bold">{t(item.name)}</ThemedText>
-        <ThemedText  style={{color: 'green'}}>{t('Total Given')}: ₹{item.totalGiven.toFixed(2)}</ThemedText>
-        <ThemedText style={{color:'red'}}>{t('Total Taken')}: ₹{item.totalTaken.toFixed(2)}</ThemedText>
-
-        <Collapsible title={t('Active Transactions')}>
-          {item.transactions.filter(t => !t.isSettled).map((transaction, index) => (
-            <ThemedView key={index} className="mt-2 p-2 bg-muted rounded">
-              {/* Existing transaction details */}
-              <ThemedText  style={{
-                color: transaction.type === 'given' ? 'green' : 'red',
-              }}>{t('Type')}: {transaction.type}</ThemedText>
-              <ThemedText style={{
-                color: transaction.type === 'given' ? 'green' : 'red',
-              }}>{t('InitialAmount')}: ₹{transaction.amount}</ThemedText>
-              <ThemedText>{t('InterestAmount')}: ₹{(transaction.currentAmount-transaction.amount).toFixed(2)}</ThemedText>
-              <ThemedText>{t('CurrentAmount')}: ₹{transaction.currentAmount.toFixed(2)}</ThemedText>
-              <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
-              <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
-              <ThemedText>{t('DaysElapsed')}: {formatElapsedTime(transaction.initialDate, new Date())}</ThemedText>
-              <ThemedText>{t('Status')}: {t('Pending')}</ThemedText>
-
-              {/* Action buttons */}
-              <View className="flex-row justify-between mt-2">
-                <TouchableOpacity onPress={() => editTransaction(transaction)} className="bg-blue-500 p-2 rounded">
-                  <ThemedText className="text-white">{t('Edit')}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="bg-red-500 p-2 rounded"
-                  onPress={() => {
-                    Alert.alert(
-                      t('Confirm Deletion'),
-                      t('Are You Sure To Delete'),
-                      [
-                        { text: t('Cancel'), style: 'cancel' },
-                        {
-                          text: t('Delete'),
-                          style: 'destructive',
-                          onPress: () => {
-                            deleteTransaction(transaction.$id!);
-                          }
-                        }
-                      ]
-                    );
-                  }}
-                >
-                  <ThemedText className="text-white">{t('Delete')}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => openSettleModal(transaction)} className="bg-green-500 p-2 rounded">
-                  <ThemedText className="text-white">{t('Settle')}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => calculateAmountForDate(transaction)} className="bg-yellow-500 p-2 rounded">
-                  <ThemedText className="text-white">{t('Calculate')}</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ThemedView>
-          ))}
-        </Collapsible>
-
-        <Collapsible title={t('Settled Transactions')}>
-          {item.transactions.filter(t => t.isSettled).map((transaction, index) => (
-            <ThemedView key={index} className="mt-2 p-2 bg-muted rounded">
-              <ThemedText  style={{
-                color: transaction.type === 'given' ? 'green' : 'red',
-              }}>{t('Type')}: {transaction.type}</ThemedText>
-              <ThemedText>{t('InitialAmount')}: {transaction.amount}</ThemedText>
-              <ThemedText>{t('SettledAmount')}: {transaction.currentAmount.toFixed(2)}</ThemedText>
-              <ThemedText>{t('InterestRate')}: ₹{transaction.rateOfInterest}</ThemedText>
-              <ThemedText>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</ThemedText>
-              <ThemedText>{t('SettledDate')}: {transaction.settledDate?.toLocaleDateString()}</ThemedText>
-              <ThemedText>{t('TimeElapsed')}: {formatElapsedTime(transaction.initialDate, transaction.settledDate!) }</ThemedText>
-              <ThemedText>{t('Remarks')}: {transaction.remarks}</ThemedText>
-            </ThemedView>
-          ))}
-        </Collapsible>
-      </ThemedView>
-    </Collapsible>
-  );
   const updateAllTransactions = async () => {
     setIsLoading(true);
     setLoadingMessage(t('UpdatingTransactions'));
@@ -519,295 +424,338 @@ export default function LoanTransactions() {
     setIsLoading(false);
     setLoadingMessage('');
   };
+
+  const renderGroupedTransaction = ({ item }: { item: GroupedTransaction }) => (
+    <List.Accordion
+      title={t(item.name)}
+      description={(
+        <Text>
+          <Text style={{ color: 'green' }}>{`${t('Total Given')}: ₹${item.totalGiven.toFixed(2)}`}</Text>
+          {' | '}
+          <Text style={{ color: 'red' }}>{`${t('Total Taken')}: ₹${item.totalTaken.toFixed(2)}`}</Text>
+        </Text>
+      )}
+      style={{ backgroundColor: '#fff', marginBottom: 10 }}
+    >
+      <Card style={{ marginBottom: 16 }}>
+        <Card.Content>
+          <List.Accordion
+            title={t('Active Transactions')}
+            left={props => <List.Icon {...props} icon="cash" />}
+            style={{ marginBottom: 2 }}
+          >
+            {item.transactions.filter(t => !t.isSettled).map((transaction, index) => (
+              <Card key={index} style={{ marginTop: 8,marginBottom:8, backgroundColor: '#f9f9f9' }}>
+                <Card.Content>
+                  <Paragraph style={{ color: transaction.type === 'given' ? 'green' : 'red' }}>
+                    {t('Type')}: {t(transaction.type)}
+                  </Paragraph>
+                  <Paragraph>{t('InitialAmount')}: ₹{transaction.amount}</Paragraph>
+                  <Paragraph>{t('InterestAmount')}: ₹{(transaction.currentAmount - transaction.amount).toFixed(2)}</Paragraph>
+                  <Paragraph>{t('CurrentAmount')}: ₹{transaction.currentAmount.toFixed(2)}</Paragraph>
+                  <Paragraph>{t('InterestRate')}: ₹{transaction.rateOfInterest}</Paragraph>
+                  <Paragraph>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</Paragraph>
+                  <Paragraph>{t('DaysElapsed')}: {formatElapsedTime(transaction.initialDate, new Date())}</Paragraph>
+                  <Paragraph>{t('Status')}: {t('Pending')}</Paragraph>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, flexWrap: 'wrap' }}>
+                    <Button 
+                      mode="contained" 
+                      onPress={() => editTransaction(transaction)}
+                      style={{ margin: 4 }}
+                    >
+                      {t('Edit')}
+                    </Button>
+                    <Button 
+                      mode="contained" 
+                      onPress={() => openSettleModal(transaction)}
+                      style={{ margin: 4 }}
+                    >
+                      {t('Settle')}
+                    </Button>
+                    <Button 
+                      mode="contained" 
+                      onPress={() => calculateAmountForDate(transaction)}
+                      style={{ margin: 4 }}
+                    >
+                      {t('Calculate')}
+                    </Button>
+                    <Button 
+                      mode="contained" 
+                      icon="delete"
+                      buttonColor="red"
+                      textColor="white"
+                      onPress={() => {
+                        Alert.alert(
+                          t('Confirm Deletion'),
+                          t('Are You Sure To Delete'),
+                          [
+                            { 
+                              text: t('Cancel'), 
+                              style: 'cancel',
+                              onPress: () => console.log('Delete cancelled') 
+                            },
+                            { 
+                              text: t('Delete'), 
+                              style: 'destructive', 
+                              onPress: () => deleteTransaction(transaction.$id!) 
+                            }
+                          ]
+                        );
+                      }}
+                      style={{ margin: 4 }}
+                    >
+                      {t('Delete')}
+                    </Button>
+                  </View>
+                </Card.Content>
+              </Card>
+            ))}
+          </List.Accordion>
+
+          <List.Accordion
+            title={t('Settled Transactions')}
+            left={props => <List.Icon {...props} icon="check-circle" />}
+            style={{ backgroundColor: 'lightgrey' }}
+          >
+            {item.transactions.filter(t => t.isSettled).map((transaction, index) => (
+              <Card key={index} style={{ marginTop: 8, backgroundColor: '#e6e6e6' }}>
+                <Card.Content>
+                  <Paragraph style={{ color: transaction.type === 'given' ? 'green' : 'red' }}>
+                    {t('Type')}: {t(transaction.type)}
+                  </Paragraph>
+                  <Paragraph>{t('InitialAmount')}: ₹{transaction.amount}</Paragraph>
+                  <Paragraph>{t('SettledAmount')}: ₹{transaction.currentAmount.toFixed(2)}</Paragraph>
+                  <Paragraph>{t('InterestRate')}: ₹{transaction.rateOfInterest}</Paragraph>
+                  <Paragraph>{t('InitialDate')}: {transaction.initialDate.toLocaleDateString()}</Paragraph>
+                  <Paragraph>{t('SettledDate')}: {transaction.settledDate?.toLocaleDateString()}</Paragraph>
+                  <Paragraph>{t('TimeElapsed')}: {formatElapsedTime(transaction.initialDate, transaction.settledDate!)}</Paragraph>
+                  <Paragraph>{t('Remarks')}: {transaction.remarks}</Paragraph>
+                </Card.Content>
+              </Card>
+            ))}
+          </List.Accordion>
+        </Card.Content>
+      </Card>
+    </List.Accordion>
+  );
+
   return (
-    <ThemedView className="flex-1 p-4">
-      <View className="flex-row justify-between mb-3">
-        <TouchableOpacity
-          onPress={() => {
-            setCurrentTransactionType('given');
-            setModalVisible(true);
-          }}
-          className="bg-green-500 p-4 rounded flex-1 mr-2"
-        >
-          <ThemedText className="text-center text-white">{t('Add Given')}</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setCurrentTransactionType('taken');
-            setModalVisible(true);
-          }}
-          className="bg-red-300 p-4 rounded flex-1 ml-2"
-        >
-          <ThemedText className="text-center text-white">{t('Add Taken')}</ThemedText>
-        </TouchableOpacity>
-      </View>
-
- <View style={{ marginVertical: 10 }}>
-  {/* <View
-    style={{
-      backgroundColor: '#FFEFD5',
-      padding: 10,
-      borderRadius: 10,
-      marginBottom: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-    }}
-  >
-    <Image
-      source={require('../../assets/images/Booklogo.png')} // Add a reminder icon in your assets folder
-      style={{ width: 20, height: 20, marginRight: 10 }}
-    />
-    <Text style={{ color: '#8B0000', fontSize: 14, fontWeight: 'bold' }}>
-      Don’t forget to update transactions daily to keep data accurate!
-    </Text>
-  </View>  */}
-
-  {/* Buttons in a Row */}
-  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-    {/* Update All Transactions Button */}
-    <TouchableOpacity
-      onPress={updateAllTransactions}
-      style={{
-        flex: 1,
-        backgroundColor: '#1E90FF',
-        paddingVertical: 12,
-        paddingHorizontal: 10,
-        borderRadius: 10,
-        marginRight: 10,
-        alignItems: 'center',
-        flexDirection: 'row',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-      }}
-    >
-      <Image
-        source={require('../../assets/images/update.jpg')} // Add an update icon in your assets folder
-        style={{ width: 30, height: 30, marginRight: 8 }}
-      />
-      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
-        {t('Update All')}
-      </Text>
-    </TouchableOpacity>
-
-    {/* Export to CSV Button */}
-    <TouchableOpacity
-      onPress={exportToCSV}
-      style={{
-        flex: 1,
-        backgroundColor: '#6A0DAD',
-        paddingVertical: 12,
-        paddingHorizontal: 10,
-        borderRadius: 10,
-        marginLeft: 10,
-        alignItems: 'center',
-        flexDirection: 'row',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-      }}
-    >
-      <Image
-        source={require('../../assets/images/exportcsv.png')} // Add an export icon in your assets folder
-        style={{ width: 30, height: 30, marginRight: 8 }}
-      />
-      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
-        {t('Export CSV')}
-      </Text>
-    </TouchableOpacity>
-  </View>
-</View>
-      {/* <ThemedText>Debug: {groupedTransactions.length} grouped transactions</ThemedText> */}
-
+    <View style={{ flex: 1, backgroundColor: '#f0f0f0' }}>
       <FlatList
         data={groupedTransactions}
         renderItem={renderGroupedTransaction}
         keyExtractor={(item) => item.name}
-        ListEmptyComponent={() => (
-          <ThemedText className="text-center mt-4">{t('No transactions found')}</ThemedText>
+        ListHeaderComponent={() => (
+          <View style={{ padding: 16 }}>
+            <Card style={{ marginBottom: 12 }}>
+              <Card.Content>
+                <Title>{t('Transaction Summary')}</Title>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                  <Button
+                    mode="contained"
+                    icon="update"
+                    onPress={updateAllTransactions}
+                  >
+                    {t('Update All')}
+                  </Button>
+                  <Button
+                    mode="contained"
+                    icon="file-export"
+                    onPress={exportToCSV}
+                  >
+                    {t('Export CSV')}
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
         )}
+        ListEmptyComponent={() => (
+          <Text style={{ textAlign: 'center', marginTop: 20 }}>{t('No transactions found')}</Text>
+        )}
+        contentContainerStyle={{ padding: 16 }}
       />
 
-      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-center"
-        >
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <ThemedView className="bg-background m-4 p-4 rounded-lg">
-              <ThemedText className="text-xl font-bold mb-4">
-                {isEditing ? t('Edit Transaction') : t('Add New Transaction')}
-              </ThemedText>
-              <View className="mb-3">
-                <ThemedText className="mb-1">{t('Name')}</ThemedText>
-                <View className="flex-row">
-                  <View className="flex-1 mr-2">
-                    <Picker
-                      selectedValue={name}
-                      onValueChange={(itemValue) => {
-                        setName(itemValue);
-                        if (itemValue !== 'new') {
-                          setCustomName(''); // Reset custom input when a predefined name is selected
-                        }
-                      }}
-                      style={{ backgroundColor: 'white', color: 'black' }}
-                    >
-                      <Picker.Item label={t('Select Name')} value="" />
-                      {existingNames.map((existingName, index) => (
-                        <Picker.Item key={index} label={existingName} value={existingName} />
-                      ))}
-                      <Picker.Item label={t('Enter New Name')} value="new" />
-                    </Picker>
-                  </View>
-                  {name === 'new' && (
-                    <View className="flex-1 ml-2">
-                      <ThemedTextInput
-                        placeholder={t('Enter New Name')}
-                        value={customName}
-                        onChangeText={(text) => setCustomName(text)}
-                        className="border rounded-lg p-2"
-                      />
-                    </View>
-                  )}
-                </View>
-              </View>
-              <ThemedTextInput
-                placeholder={t('Amount')}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-                className="mb-3 border rounded-lg p-2"
-              />
-              <ThemedTextInput
-                placeholder={t('InterestRate')}
-                value={rateOfInterest}
-                onChangeText={setRateOfInterest}
-                keyboardType="numeric"
-                className="mb-3 border rounded-lg p-2"
-              />
-              <TouchableOpacity
-                onPress={() => setDatePickerVisible(true)}
-                className="p-2 mb-4 bg-blue-600 rounded-md"
-              >
-                <ThemedText className="text-center">
-                  {t('SelectDate')}: {selectedDate.toLocaleDateString()}
-                </ThemedText>
-              </TouchableOpacity>
-              {isDatePickerVisible && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setDatePickerVisible(false);
-                    if (date) setSelectedDate(date);
-                  }}
-                />
-              )}
-              <TouchableOpacity onPress={addTransaction} className="bg-green-500 p-3 rounded-md">
-                <ThemedText className="text-white text-center">
-                  {isEditing ? t('Update') : t('Add')}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={resetForm} className="bg-red-500 p-3 rounded-md mt-2">
-                <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {pathname === '/ledger' && (
+        <Portal>
+          <FAB.Group
+            visible={true}
+            open={fabOpen}
+            icon={fabOpen ? 'close' : 'plus'}
+            actions={[
+              { icon: 'cash-plus', label: t('Add Given'), onPress: () => { setCurrentTransactionType('given'); setModalVisible(true); } },
+              { icon: 'cash-minus', label: t('Add Taken'), onPress: () => { setCurrentTransactionType('taken'); setModalVisible(true); } },
+            ]}
+            onStateChange={({ open }) => setFabOpen(open)}
+            onPress={() => {
+              if (fabOpen) {
+                // do something if the speed dial is open
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: 80, // Adjust this value to move the FAB higher
+              right: 0,
+            }}
+          />
+        </Portal>
+      )}
 
-      <Modal visible={isCalculationModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-center"
-        >
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <ThemedView className="bg-background m-4 p-4 rounded-lg">
-              <ThemedText className="text-xl font-bold mb-4">{t('Calculate Amount')}</ThemedText>
-              <TouchableOpacity
-                onPress={() => setDatePickerVisible(true)}
-                className="p-2 mb-4 bg-blue-600 rounded-md"
-              >
-                <ThemedText className="text-center">
-                  {t('SelectDate')}: {calculationDate.toLocaleDateString()}
-                </ThemedText>
-              </TouchableOpacity>
-              {isDatePickerVisible && (
-                <DateTimePicker
-                  value={calculationDate}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setDatePickerVisible(false);
-                    if (date) setCalculationDate(date);
-                  }}
-                />
-              )}
-              <TouchableOpacity onPress={performCalculation} className="bg-green-500 p-3 rounded-md mb-2">
-                <ThemedText className="text-white text-center">{t('Calculate')}</ThemedText>
-              </TouchableOpacity>
-              {calculatedAmount > 0 && (
-                <ThemedText className="text-lg mt-4">
-                  {t('CalculatedAmount')}: {calculatedAmount.toFixed(2)}
-                </ThemedText>
-              )}
-              <TouchableOpacity
-                onPress={() => {
-                  setCalculationModalVisible(false);
-                  setCalculatedAmount(0);
+      <Portal>
+        <Dialog visible={isModalVisible} onDismiss={() => setModalVisible(false)}>
+          <Dialog.Title>{isEditing ? t('Edit Transaction') : t('Add New Transaction')}</Dialog.Title>
+          <Dialog.Content>
+            <View style={{ marginBottom: 16 }}>
+              <Text>{t('Name')}</Text>
+              <Picker
+                selectedValue={name}
+                onValueChange={(itemValue) => {
+                  setName(itemValue);
+                  if (itemValue !== 'new') {
+                    setCustomName('');
+                  }
                 }}
-                className="bg-red-500 p-3 rounded-md mt-4"
+                style={{ backgroundColor: 'white' }}
               >
-                <ThemedText className="text-white text-center">{t('Close')}</ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <Modal visible={isSettleModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-center"
-        >
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <ThemedView className="bg-background m-4 p-4 rounded-lg">
-              <ThemedText className="text-xl font-bold mb-4">{t('Settle Transaction')}</ThemedText>
-              <ThemedTextInput
-                placeholder={t('Settle Amount')}
-                value={settleAmount}
-                onChangeText={setSettleAmount}
-                keyboardType="numeric"
-                className="mb-3 border rounded-lg p-2"
+                <Picker.Item label={t('Select Name')} value="" />
+                {existingNames.map((existingName, index) => (
+                  <Picker.Item key={index} label={existingName} value={existingName} />
+                ))}
+                <Picker.Item label={t('Enter New Name')} value="new" />
+              </Picker>
+              {name === 'new' && (
+                <TextInput
+                  label={t('Enter New Name')}
+                  value={customName}
+                  onChangeText={(text) => setCustomName(text)}
+                  style={{ marginTop: 8 }}
+                />
+              )}
+            </View>
+            <TextInput
+              label={t('Amount')}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+              style={{ marginBottom: 16 }}
+            />
+            <TextInput
+              label={t('InterestRate')}
+              value={rateOfInterest}
+              onChangeText={setRateOfInterest}
+              keyboardType="numeric"
+              style={{ marginBottom: 16 }}
+            />
+            <Button
+              mode="outlined"
+              onPress={() => setDatePickerVisible(true)}
+              style={{ marginBottom: 16 }}
+            >
+              {t('SelectDate')}: {selectedDate.toLocaleDateString()}
+            </Button>
+            {isDatePickerVisible && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setDatePickerVisible(false);
+                  if (date) setSelectedDate(date);
+                }}
               />
-              <ThemedTextInput
-                placeholder={t('Remarks')}
-                value={settleRemarks}
-                onChangeText={setSettleRemarks}
-                multiline
-                numberOfLines={3}
-                className="mb-3 border rounded-lg p-2"
-              />
-              <TouchableOpacity onPress={settleTransaction} className="bg-green-500 p-3 rounded-md">
-                <ThemedText className="text-white text-center">{t('Settle')}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setIsSettleModalVisible(false)}
-                className="bg-red-500 p-3 rounded-md mt-2"
-              >
-                <ThemedText className="text-white text-center">{t('Cancel')}</ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setModalVisible(false)} style={{ marginRight: 8 }}>
+              {t('Cancel')}
+            </Button>
+            <Button mode="contained" onPress={addTransaction}>
+              {isEditing ? t('Update') : t('Add')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
-      {isLoading && (<LoadingOverlay message={loadingMessage} />)}
-    </ThemedView>
+      <Portal>
+        <Dialog visible={isCalculationModalVisible} onDismiss={() => setCalculationModalVisible(false)}>
+          <Dialog.Title>{t('Calculate Amount')}</Dialog.Title>
+          <Dialog.Content>
+            <Button
+              mode="outlined"
+              onPress={() => setDatePickerVisible(true)}
+              style={{ marginBottom: 16 }}
+            >
+              {t('SelectDate')}: {calculationDate.toLocaleDateString()}
+            </Button>
+            {isDatePickerVisible && (
+              <DateTimePicker
+                value={calculationDate}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setDatePickerVisible(false);
+                  if (date) setCalculationDate(date);
+                }}
+              />
+            )}
+            {calculatedAmount > 0 && (
+              <Paragraph style={{ marginTop: 16 }}>
+                {t('CalculatedAmount')}: {calculatedAmount.toFixed(2)}
+              </Paragraph>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setCalculationModalVisible(false)} style={{ marginRight: 8 }}>
+              {t('Close')}
+            </Button>
+            <Button mode="contained" onPress={performCalculation}>
+              {t('Calculate')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Portal>
+        <Dialog visible={isSettleModalVisible} onDismiss={() => setIsSettleModalVisible(false)}>
+          <Dialog.Title>{t('Settle Transaction')}</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label={t('Settle Amount')}
+              value={settleAmount}
+              onChangeText={setSettleAmount}
+              keyboardType="numeric"
+              style={{ marginBottom: 16 }}
+            />
+            <TextInput
+              label={t('Remarks')}
+              value={settleRemarks}
+              onChangeText={setSettleRemarks}
+              multiline
+              numberOfLines={3}
+              style={{ marginBottom: 16 }}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsSettleModalVisible(false)} style={{ marginRight: 8 }}>
+              {t('Cancel')}
+            </Button>
+            <Button mode="contained" onPress={settleTransaction}>
+              {t('Settle')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Portal>
+        <Dialog visible={isLoading} dismissable={false}>
+          <Dialog.Title>{loadingMessage}</Dialog.Title>
+          <Dialog.Content>
+            <ActivityIndicator animating={true} size="large" />
+          </Dialog.Content>
+        </Dialog>
+      </Portal>
+    </View>
   );
 }
+

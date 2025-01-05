@@ -8,12 +8,14 @@ import { HapticTab } from '../../components/HapticTab';
 import TabBarBackground  from '../../components/ui/TabBarBackground';
 import { LanguageToggle } from '../../components/LanguageToggle';
 import { LanguageProvider } from '../../contexts/LanguageContext';
+import { PaperProvider } from 'react-native-paper';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
 
   return (
+    <PaperProvider>
     <LanguageProvider>
       <Tabs
         screenOptions={{
@@ -52,6 +54,7 @@ export default function RootLayout() {
         />
       </Tabs>
     </LanguageProvider>
+    </PaperProvider>
   );
 }
 
