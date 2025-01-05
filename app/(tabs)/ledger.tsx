@@ -429,11 +429,10 @@ export default function LoanTransactions() {
     <List.Accordion
       title={t(item.name)}
       description={(
-        <Text>
-          <Text style={{ color: 'green' }}>{`${t('Total Given')}: ₹${item.totalGiven.toFixed(2)}`}</Text>
-          {' | '}
-          <Text style={{ color: 'red' }}>{`${t('Total Taken')}: ₹${item.totalTaken.toFixed(2)}`}</Text>
-        </Text>
+          <View>
+              <Text style={{ color: 'green' }}>{`${t('Total Given')}: ₹${item.totalGiven.toFixed(2)}`}</Text>
+              <Text style={{ color: 'red' }}>{`${t('Total Taken')}: ₹${item.totalTaken.toFixed(2)}`}</Text>
+          </View>
       )}
       style={{ backgroundColor: '#fff', marginBottom: 10 }}
     >
@@ -458,9 +457,11 @@ export default function LoanTransactions() {
                   <Paragraph>{t('DaysElapsed')}: {formatElapsedTime(transaction.initialDate, new Date())}</Paragraph>
                   <Paragraph>{t('Status')}: {t('Pending')}</Paragraph>
 
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, flexWrap: 'wrap' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap' }}>
                     <Button 
                       mode="contained" 
+                      icon="pencil"
+                      buttonColor="blue"
                       onPress={() => editTransaction(transaction)}
                       style={{ margin: 4 }}
                     >
@@ -468,6 +469,8 @@ export default function LoanTransactions() {
                     </Button>
                     <Button 
                       mode="contained" 
+                      icon="cash-multiple"
+                      buttonColor="green"
                       onPress={() => openSettleModal(transaction)}
                       style={{ margin: 4 }}
                     >
@@ -475,6 +478,8 @@ export default function LoanTransactions() {
                     </Button>
                     <Button 
                       mode="contained" 
+                      icon="calculator"
+                      buttonColor="orange"
                       onPress={() => calculateAmountForDate(transaction)}
                       style={{ margin: 4 }}
                     >

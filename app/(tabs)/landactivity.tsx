@@ -182,7 +182,7 @@ useFocusEffect(
       })}
     >
         <Card className='mb-2'>
-            <Card.Content style={{ backgroundColor: !item.isSettled ? '#2da42f' : '#eb3b3b' }}>
+            <Card.Content style={{ backgroundColor: !item.isSettled ? '#369817' : '#828f7f' }}>
             <ThemedText>{t(item.name)}</ThemedText>
             </Card.Content>
             </Card>
@@ -209,7 +209,7 @@ useFocusEffect(
   onPress={() => setShowNewNameModal(true)}
   style={{ margin: 8 }}
 >
-  Add New Name
+  {t("Add New Name")}
 </Button>
 <Modal visible={showNewNameModal} transparent={true} animationType="slide">
   <View style={{ flex: 1, justifyContent: 'flex-end', padding: 24 }}>

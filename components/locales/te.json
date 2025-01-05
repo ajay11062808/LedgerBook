@@ -13,7 +13,8 @@
       "error": "లోపం",
       "Home":"హోమ్",
 
-
+      
+      "Add New Name": "కొత్త పేరు జోడించండి",
       "LandActivity": "భూమి కార్యకలాపాలు",
       "Activity": "భూమి కార్యకలాపం",
       "Activities":"భూమి కార్యకలాపాలు",
@@ -21,8 +22,9 @@
       "landName": "భూమి పేరు",
       "activity": "కార్యకలాపం",
       "landInAcres": "ఎకరాల్లో భూమి",
-      "Land Size": "ఎకరాల్లో భూమి",
+      "Land Size": "భూమి ఎకరాల్లో",
       "Land Name": "భూమి పేరు",
+      "Land Size (Acres)":"భూమి పరిమాణం (ఎకరాలు)",
       "cent": "సెంట్",
       "cents": "సెంట్లు",
       "acre": "ఎకరం",
@@ -53,6 +55,8 @@
       "type": "రకం",
       "given": "ఇచ్చినది",
       "taken": "తీసుకున్నది",
+      "Total Given": "మొత్తం ఇచ్చినవి",
+      "Total Taken": "మొత్తం తీసుకున్నవి",
 
       "title": "పరిష్కరించు",
       "Active Transactions":"ప్రస్తుత లావాదేవీలు",
@@ -65,6 +69,8 @@
       "Remaining Amount": "ఇంకా ఇవ్వవలసిన మొత్తం",
       "Fully Settled": "పూర్తిగా జమచేయబడింది",
       "Partial Settlement": "పాక్షిక జమ నమోదు చేయబడింది",
+
+
       "Gorru": "గొఱ్ఱు",
       "Balam Mandhu": "బలం మందు",
       "Balam": "బలం మందు",

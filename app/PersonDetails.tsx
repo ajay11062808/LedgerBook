@@ -348,15 +348,15 @@ export default function PersonDetails() {
             <Text variant="headlineMedium" style={styles.name}>{name}</Text>
             <View style={styles.row}>
               <Text variant="bodyMedium">{t('Total Amount')}:</Text>
-              <Text variant="bodyMedium" style={styles.value}>₹{totalAmount}</Text>
+              <Text variant="bodyMedium" style={styles.value_main}>₹{totalAmount}</Text>
             </View>
             <View style={styles.row}>
               <Text variant="bodyMedium">{t('Settled Amount')}:</Text>
-              <Text variant="bodyMedium" style={styles.value}>₹{settledAmount}</Text>
+              <Text variant="bodyMedium" style={styles.value_main}>₹{settledAmount}</Text>
             </View>
             <View style={styles.row}>
               <Text variant="bodyMedium">{t('Remaining Amount')}:</Text>
-              <Text variant="bodyMedium" style={styles.value}>₹{totalAmount-settledAmount}</Text>
+              <Text variant="bodyMedium" style={styles.value_main}>₹{totalAmount-settledAmount}</Text>
             </View>
             <View style={styles.row}>
               <Text variant="bodyMedium">{t('Status')}:</Text>
@@ -686,7 +686,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: 14,
+    padding: 8,
   },
   name: {
     marginBottom: 8,
@@ -699,6 +700,14 @@ const styles = StyleSheet.create({
   },
   value: {
     fontWeight: 'bold',
+    flex: 1, // Allows the value to take only necessary space
+    textAlign: 'left', // Aligns the value to the right for better readability
+    marginLeft: 8, // Reduces the gap between key and value
+  },
+  value_main:{
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
   },
   sectionTitle: {
     marginTop: 16,
