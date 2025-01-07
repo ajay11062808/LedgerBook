@@ -449,7 +449,8 @@ export default function LoanTransactions() {
             left={props => <List.Icon {...props} icon="cash" />}
             style={{ marginBottom: 2 }}
           >
-            {item.transactions.filter(t => !t.isSettled).map((transaction, index) => (
+            {item.transactions.filter(t => !t.isSettled).sort((a, b) => new Date(b.initialDate).getTime() - new Date(a.initialDate).getTime()).map((transaction, index) => (
+              
               <Card key={index} style={{ marginTop: 8,marginBottom:8, backgroundColor: '#f9f9f9' }}>
                 <Card.Content>
                   <Paragraph style={{ color: transaction.type === 'given' ? 'green' : 'red' }}>
@@ -530,7 +531,7 @@ export default function LoanTransactions() {
             left={props => <List.Icon {...props} icon="check-circle" />}
             style={{ backgroundColor: 'lightgrey' }}
           >
-            {item.transactions.filter(t => t.isSettled).map((transaction, index) => (
+            {item.transactions.filter(t => t.isSettled).sort((a, b) => new Date(b.initialDate).getTime() - new Date(a.initialDate).getTime()).map((transaction, index) => (
               <Card key={index} style={{ marginTop: 8, backgroundColor: '#e6e6e6' }}>
                 <Card.Content>
                   <Paragraph style={{ color: transaction.type === 'given' ? 'green' : 'red' }}>
