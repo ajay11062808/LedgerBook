@@ -622,7 +622,7 @@ export default function LoanTransactions() {
             <View style={{ marginBottom: 16 }}>
               <Text>{t('Name')}</Text>
               <Picker
-                selectedValue={name}
+                selectedValue={t(name)}
                 onValueChange={(itemValue) => {
                   setName(itemValue);
                   if (itemValue !== 'new') {
@@ -633,7 +633,7 @@ export default function LoanTransactions() {
               >
                 <Picker.Item label={t('Select Name')} value="" />
                 {existingNames.map((existingName, index) => (
-                  <Picker.Item key={index} label={existingName} value={existingName} />
+                  <Picker.Item key={index} label={t(existingName)} value={existingName} />
                 ))}
                 <Picker.Item label={t('Enter New Name')} value="new" />
               </Picker>
