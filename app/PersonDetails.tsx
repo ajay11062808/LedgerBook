@@ -345,7 +345,7 @@ export default function PersonDetails() {
         
         <Card style={styles.card}>
           <Card.Content>
-            <Text variant="headlineMedium" style={styles.name}>{name}</Text>
+            <Text variant="headlineMedium" style={styles.name}>{t(name)}</Text>
             <View style={styles.row}>
               <Text variant="bodyMedium">{t('Total Amount')}:</Text>
               <Text variant="bodyMedium" style={styles.value_main}>₹{totalAmount}</Text>
